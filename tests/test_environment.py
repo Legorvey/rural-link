@@ -20,7 +20,7 @@ def test_modules_import():
         importlib.import_module(f"src.{m}")
 
 
-def test_config_flags_engine_unimplemented():
+def test_config_flags_engine_implemented():
     import config
 
-    assert config.SCIENTIFIC_ENGINE_IMPLEMENTED is False
+    assert config.SCIENTIFIC_ENGINE_IMPLEMENTED is True
