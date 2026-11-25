@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use RuralLink in academic work or presentations, please cite it as below."
+title: "RuralLink: Adaptive Uplink Coverage Simulator"
+abstract: "Reproducible Python link-level simulator for uplink coverage limits and joint adaptive modulation–bandwidth allocation at 900/1800 MHz in Indonesian 3T regions (Group 1, Digital Communication Systems)."
+type: software
+authors:
+  - given-names: "Aditya"
+  - given-names: "Zahran"
+  - given-names: "Baihaqy"
+  - given-names: "Jeyd"
+  - given-names: "Rizqul"
+  - given-names: "Yusril"
+repository-code: "https://github.com/Legorvey/rural-link"
+keywords:
+  - uplink coverage
+  - adaptive modulation
+  - bandwidth allocation
+  - 3T Indonesia
+  - Monte Carlo simulation
+  - digital communication systems

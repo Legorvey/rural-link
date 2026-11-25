@@ -75,3 +75,14 @@ All reference PDFs in `references/` inspected and recorded in `docs/REFERENCES.m
 ### Recovery & Independent Audit (2026-11-25)
 - Independent scientific audit (`code-reviewer`) verified all 12 core areas (Gray mapping, `E_s=1`, AWGN `N_0/2` normalization, `E_s/N_0` vs `E_b/N_0` distinction, Rayleigh `E[|h|^2]=1` & ZF equalization, exact Cho–Yoon QAM BER, `BER=1e-2` thresholds, no double-counted shadowing/RB gain, Wilson/rule-of-three CIs, seeded RNG) with 0 confirmed defects.
 - Final verification: `pytest` 77/77 passed, `ruff check` & `ruff format --check` clean, `experiments.run_experiments` completed (5.3 s), Streamlit `/_stcore/health` HTTP 200.
+
+
+---
+
+## Documentation & Team Knowledge Hub: COMPLETE (2026-11-25)
+- **Done:** Transformed repository into a structured research hub for the 6-person team:
+  - Rewrote `README.md` as the main Indonesian/English research hub.
+  - Created `docs/START_HERE.md`, `docs/RESEARCH_OVERVIEW.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPER_GUIDE.md`, `docs/RESULTS_GUIDE.md`, `docs/TEAM_HANDOFF.md`, `docs/PRESENTATION_GUIDE.md`, `docs/AI_HANDOFF.md`, `docs/GLOSSARY.md`.
+  - Created `CONTRIBUTING.md`, `CITATION.cff`, and `docs/assets/rurallink-mark.svg`; updated `AGENTS.md`.
+- **Current Scientific Status:** Phase 01–03 complete and independently audited (77/77 tests passing, 0 ruff errors). Phase 04 (`src/adaptive.py` and S0–S3 comparative experiments), Phase 05 (full Streamlit dashboard), Phase 06 (final audit), and Phase 07 (deployment) remain **pending** authorization.
+- **Documentation Limitations:** Phase 04–07 sections are explicitly marked pending; PPT and analysis team member pairings remain pending confirmation.
