@@ -1,0 +1,30 @@
+# Kamus Istilah Teknis (Glossary) — RuralLink
+
+- **Uplink / Downlink:** Arah komunikasi dari perangkat pengguna (HP/UE) ke menara BTS (*uplink*), dan dari BTS ke HP (*downlink*).
+- **UE / BTS:** *User Equipment* (perangkat pengguna/HP) dan *Base Transceiver Station* (menara pemancar seluler).
+- **dB / dBm / dBi:** Satuan skala logaritmik: `dB` untuk rasio/rugi-rugi, `dBm` untuk daya relatif terhadap 1 mW, `dBi` untuk penguatan antena relatif terhadap antena isotropis.
+- **Path Loss:** Redaman daya sinyal radio selama merambat di udara dari pemancar ke penerima (satuan: dB).
+- **CI Model (*Close-In*):** Model *path loss* yang menggunakan jarak referensi dekat $d_0 = 1\text{ m}$ dan satu eksponen redaman $n$.
+- **LOS / NLOS:** *Line-of-Sight* (jalur pandang langsung tanpa halangan) dan *Non-Line-of-Sight* (jalur terhalang medan atau vegetasi).
+- **Shadow Fading:** Variasi acak daya sinyal akibat halangan besar (bukit, pepohonan), dimodelkan berdistribusi normal dalam dB dengan standar deviasi $\sigma$.
+- **Multipath:** Sinyal yang tiba di penerima melalui banyak pantulan dengan waktu tempuh berbeda.
+- **AWGN:** *Additive White Gaussian Noise* — model kanal ideal hanya dengan derau termal acak tanpa *fading*.
+- **Rayleigh Fading:** Model statistik fluktuasi sinyal akibat *multipath* ketika tidak ada komponen LOS dominan.
+- **SNR / SINR:** *Signal-to-Noise Ratio* (rasio daya sinyal terhadap derau) dan *Signal-to-Interference-plus-Noise Ratio* (memasukkan interferensi).
+- **$E_s/N_0$ dan $E_b/N_0$:** Energi per simbol terhadap rapat daya derau ($E_s/N_0$) dan energi per bit terhadap rapat daya derau ($E_b/N_0$).
+- **BER / SER:** *Bit Error Rate* (rasio bit salah) dan *Symbol Error Rate* (rasio simbol salah).
+- **BPSK / QPSK / QAM:** Skema modulasi digital dengan jumlah bit per simbol berbeda: BPSK (1), QPSK (2), 16-QAM (4), 64-QAM (6).
+- **Constellation:** Peta titik-titik simbol kompleks pada bidang I/Q untuk merepresentasikan bit digital.
+- **Gray Coding:** Penomoran bit pada konstelasi sehingga dua simbol berdekatan hanya berbeda 1 bit, meminimalkan BER.
+- **Resource Block (RB):** Satuan alokasi frekuensi terkecil pada LTE sebesar `180 kHz`.
+- **Bandwidth:** Lebar pita frekuensi aktif yang digunakan untuk transmisi sinyal (Hz atau MHz).
+- **Power Concentration:** Pemusatan daya pancar tetap UE ke jumlah RB yang lebih sedikit sehingga derau penerima mengecil dan SNR naik.
+- **Adaptive Modulation:** Penyesuaian otomatis jenis modulasi berdasarkan kualitas kanal (SNR).
+- **Nominal Data Rate:** Laju data ideal ($B_{\text{active}} \cdot k$, dalam bps/Mbps) sebelum dikurangi *overhead* protokol.
+- **Spectral Efficiency:** Efisiensi penggunaan spektrum dalam satuan bit/detik/Hz (`bps/Hz`).
+- **Monte Carlo:** Metode simulasi berbasis pengacakan berulang untuk mengestimasi performa sistem secara empiris.
+- **Outage:** Kondisi ketika kualitas tautan gagal memenuhi batas minimum keandalan (mis. $\text{BER} > 10^{-2}$).
+- **Reliable Coverage Radius:** Jarak maksimum dari BTS di mana probabilitas *outage* masih di bawah batas target (mis. $\le 5\%$).
+- **Random Seed:** Angka awal pembangkit bilangan acak (mis. `42`) agar simulasi dapat diulang dengan hasil persis sama.
+- **Perfect CSI:** Asumsi penerima mengetahui respons kanal secara sempurna tanpa kesalahan estimasi.
+- **Link-Level Simulation:** Simulasi tingkat tautan fisik (bit, simbol, kanal) antara satu pemancar dan satu penerima.
