@@ -61,7 +61,8 @@ st.set_page_config(page_title="RuralLink | Kelompok 1", layout="wide")
 st.markdown(
     """
 <style>
-.block-container {padding-top: 1.2rem; max-width: 1500px;}
+.block-container {padding-top: 4rem; max-width: 1500px;}
+[data-testid="stMain"] {overflow-y: auto;}
 h1, h2, h3 {color: #0F2A47;}
 .rl-head {border-bottom: 2px solid #0F766E; padding-bottom: .5rem; margin-bottom: .8rem;}
 .rl-head h1 {font-size: 1.7rem; margin: 0; padding: 0;}
