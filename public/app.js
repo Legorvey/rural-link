@@ -88,6 +88,10 @@
   let dragRafId = null;
   let isDraggingSnr = false;
   let activePointerId = null;
+  let snrStaticCanvas = null;
+  let snrStaticKey = "";
+  let mapStaticCanvas = null;
+  let mapStaticKey = "";
 
   function fmtIdNum(val, decimals) {
     return Number(val).toFixed(decimals).replace(".", ",");
@@ -436,6 +440,25 @@
     return series[bestIdx];
   }
 
+  function syncDragReadouts() {
+    document.getElementById("rngDist").value = String(state.dist_km);
+    document.getElementById("rngPt").value = String(state.tx_power_dbm);
+    document.getElementById("lblDist").textContent = `${fmtIdNum(state.dist_km, 2)} km`;
+    document.getElementById("lblPt").textContent = `${state.tx_power_dbm} dBm`;
+  }
+
+  function drawCrispLabel(ctx, text, x, y, align, fillColor) {
+    ctx.save();
+    ctx.textAlign = align;
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fillColor;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
   function drawSnrChart(data) {
     if (!data) return;
     const { ctx, W, H } = setupCanvas("cvSnr", SNR_W, SNR_H);
@@ -455,86 +478,119 @@
     const xToPx = (d) => pad.l + ((d - 1.0) / 11.0) * pw;
     const yToPx = (s) => pad.t + ((yMax - Math.max(yMin, Math.min(yMax, s))) / (yMax - yMin)) * ph;
 
-    ctx.strokeStyle = "#E2E8F0";
-    ctx.lineWidth = 1;
-    ctx.fillStyle = "#475569";
-    ctx.font = "11px sans-serif";
-
-    for (let y = yMin; y <= yMax; y += 10) {
-      const py = yToPx(y);
-      ctx.beginPath();
-      ctx.moveTo(pad.l, py);
-      ctx.lineTo(W - pad.r, py);
-      ctx.stroke();
-      ctx.textAlign = "right";
-      ctx.fillText(`${y} dB`, pad.l - 6, py + 4);
-    }
-
-    for (let d = 1; d <= 12; d += 1) {
-      const px = xToPx(d);
-      ctx.beginPath();
-      ctx.moveTo(px, pad.t);
-      ctx.lineTo(px, H - pad.b);
-      ctx.stroke();
-      ctx.textAlign = "center";
-      ctx.fillText(`${d} km`, px, H - 18);
-    }
-
-    const drawCrispLabel = (text, x, y, align, fillColor) => {
-      ctx.save();
-      ctx.textAlign = align;
-      ctx.lineJoin = "round";
-      ctx.lineWidth = 3.5;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
-      ctx.strokeText(text, x, y);
-      ctx.fillStyle = fillColor;
-      ctx.fillText(text, x, y);
-      ctx.restore();
-    };
-
-    ["QPSK", "16-QAM", "64-QAM"].forEach((mod) => {
-      const th = data.thresholds[mod];
-      if (!th) return;
-      const py = yToPx(th.esn0_db);
-      ctx.save();
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = "#94A3B8";
-      ctx.lineWidth = 1.1;
-      ctx.beginPath();
-      ctx.moveTo(pad.l, py);
-      ctx.lineTo(W - pad.r, py);
-      ctx.stroke();
-      ctx.restore();
-      drawCrispLabel(`${mod} (${th.esn0_db.toFixed(1)} dB)`, W - pad.r - 4, py - 4, "right", "#334155");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const nextStaticKey = JSON.stringify({
+      e: state.env,
+      s: state.shadow,
+      p: state.tx_power_dbm,
+      b: state.ber_target,
+      f: state.freq_mhz,
+      rb: data.active.rb,
+      yMin,
+      yMax,
+      W,
+      H,
+      dpr,
     });
 
-    const dists = data.distances_km;
-    [700, 900, 1800].forEach((f) => {
-      const curves = data.snr_curves[String(f)];
-      const col = FREQ_COLORS[f];
+    if (snrStaticKey !== nextStaticKey || !snrStaticCanvas) {
+      snrStaticCanvas = document.createElement("canvas");
+      snrStaticCanvas.width = Math.round(W * dpr);
+      snrStaticCanvas.height = Math.round(H * dpr);
+      const sctx = snrStaticCanvas.getContext("2d");
+      sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const drawSeries = (vals, dash, width) => {
-        ctx.save();
-        ctx.strokeStyle = col;
-        ctx.lineWidth = width;
-        ctx.setLineDash(dash);
-        ctx.beginPath();
-        vals.forEach((v, idx) => {
-          const px = xToPx(dists[idx]);
-          const py = yToPx(v);
-          if (idx === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        });
-        ctx.stroke();
-        ctx.restore();
-      };
+      sctx.strokeStyle = "#E2E8F0";
+      sctx.lineWidth = 1;
+      sctx.fillStyle = "#475569";
+      sctx.font = "11px sans-serif";
 
-      drawSeries(curves.rb_1, [], f === state.freq_mhz && data.active.rb === 1 ? 3.0 : 1.7);
-      drawSeries(curves.rb_25, [3, 3], f === state.freq_mhz && data.active.rb === 25 ? 2.8 : 1.5);
-      if (curves.rb_active) {
-        drawSeries(curves.rb_active, [7, 3], 2.8);
+      for (let y = yMin; y <= yMax; y += 10) {
+        const py = yToPx(y);
+        sctx.beginPath();
+        sctx.moveTo(pad.l, py);
+        sctx.lineTo(W - pad.r, py);
+        sctx.stroke();
+        sctx.textAlign = "right";
+        sctx.fillText(`${y} dB`, pad.l - 6, py + 4);
       }
-    });
+
+      for (let d = 1; d <= 12; d += 1) {
+        const px = xToPx(d);
+        sctx.beginPath();
+        sctx.moveTo(px, pad.t);
+        sctx.lineTo(px, H - pad.b);
+        sctx.stroke();
+        sctx.textAlign = "center";
+        sctx.fillText(`${d} km`, px, H - 18);
+      }
+
+      ["QPSK", "16-QAM", "64-QAM"].forEach((mod) => {
+        const th = data.thresholds[mod];
+        if (!th) return;
+        const py = yToPx(th.esn0_db);
+        sctx.save();
+        sctx.setLineDash([4, 4]);
+        sctx.strokeStyle = "#94A3B8";
+        sctx.lineWidth = 1.1;
+        sctx.beginPath();
+        sctx.moveTo(pad.l, py);
+        sctx.lineTo(W - pad.r, py);
+        sctx.stroke();
+        sctx.restore();
+        drawCrispLabel(
+          sctx,
+          `${mod} (${th.esn0_db.toFixed(1)} dB)`,
+          W - pad.r - 4,
+          py - 4,
+          "right",
+          "#334155"
+        );
+      });
+
+      const dists = data.distances_km;
+      [700, 900, 1800].forEach((f) => {
+        const curves = data.snr_curves[String(f)];
+        const col = FREQ_COLORS[f];
+
+        const drawSeries = (vals, dash, width) => {
+          sctx.save();
+          sctx.strokeStyle = col;
+          sctx.lineWidth = width;
+          sctx.setLineDash(dash);
+          sctx.beginPath();
+          vals.forEach((v, idx) => {
+            const px = xToPx(dists[idx]);
+            const py = yToPx(v);
+            if (idx === 0) sctx.moveTo(px, py);
+            else sctx.lineTo(px, py);
+          });
+          sctx.stroke();
+          sctx.restore();
+        };
+
+        drawSeries(curves.rb_1, [], f === state.freq_mhz && data.active.rb === 1 ? 3.0 : 1.7);
+        drawSeries(curves.rb_25, [3, 3], f === state.freq_mhz && data.active.rb === 25 ? 2.8 : 1.5);
+        if (curves.rb_active) {
+          drawSeries(curves.rb_active, [7, 3], 2.8);
+        }
+      });
+
+      [700, 900, 1800].forEach((f, idx) => {
+        const lx = pad.l + 8;
+        const ly = pad.t + 14 + idx * 16;
+        sctx.fillStyle = FREQ_COLORS[f];
+        sctx.fillRect(lx, ly - 5, 16, 3);
+        sctx.fillStyle = "#0F172A";
+        sctx.font = "11px sans-serif";
+        sctx.textAlign = "left";
+        sctx.fillText(`${f} MHz${f === state.freq_mhz ? " (aktif)" : ""}`, lx + 22, ly);
+      });
+
+      snrStaticKey = nextStaticKey;
+    }
+
+    ctx.drawImage(snrStaticCanvas, 0, 0, W, H);
 
     // Active distance cursor & draggable yellow operating-point marker
     const cx = xToPx(state.dist_km);
@@ -568,24 +624,18 @@
     ctx.fill();
     ctx.stroke();
 
-    // Compact readout tag beside dragged marker
     ctx.font = "bold 11px sans-serif";
     const align = cx > W - 120 ? "right" : "left";
     const tagX = cx > W - 120 ? cx - 10 : cx + 10;
     const tagY = Math.max(pad.t + 14, Math.min(H - pad.b - 6, pyAct - 10));
-    drawCrispLabel(`${fmtIdNum(state.dist_km, 2)} km · ${fmtIdNum(activeSnr, 1)} dB`, tagX, tagY, align, "#0F172A");
-
-    // Legend
-    [700, 900, 1800].forEach((f, idx) => {
-      const lx = pad.l + 8;
-      const ly = pad.t + 14 + idx * 16;
-      ctx.fillStyle = FREQ_COLORS[f];
-      ctx.fillRect(lx, ly - 5, 16, 3);
-      ctx.fillStyle = "#0F172A";
-      ctx.font = "11px sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(`${f} MHz${f === state.freq_mhz ? " (aktif)" : ""}`, lx + 22, ly);
-    });
+    drawCrispLabel(
+      ctx,
+      `${fmtIdNum(state.dist_km, 2)} km · ${fmtIdNum(activeSnr, 1)} dB`,
+      tagX,
+      tagY,
+      align,
+      "#0F172A"
+    );
   }
 
   function drawConstellations() {
@@ -702,60 +752,95 @@
     const R_px = 104;
     const rMaxKm = 12.0;
     const cy = H / 2 + 2;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    zoneData.zones.forEach((zone, idx) => {
-      const cx = centers[idx];
-      const isSelectedFreq = zone.freq_mhz === state.freq_mhz;
+    const nextMapKey = JSON.stringify({
+      z: currentZoneKey(),
+      f: state.freq_mhz,
+      r: state.show_reliability,
+      W,
+      H,
+      dpr,
+    });
 
-      // Clean base cell disk (12 km)
-      ctx.fillStyle = MOD_COLOR.Outage;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
-      ctx.fill();
+    if (mapStaticKey !== nextMapKey || !mapStaticCanvas) {
+      mapStaticCanvas = document.createElement("canvas");
+      mapStaticCanvas.width = Math.round(W * dpr);
+      mapStaticCanvas.height = Math.round(H * dpr);
+      const mctx = mapStaticCanvas.getContext("2d");
+      mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Seamless filled modulation zones (no harsh white ring strokes)
-      const sortedRings = [...zone.rings].sort((a, b) => b.outer_km - a.outer_km);
-      sortedRings.forEach((ring) => {
-        if (ring.modulation === "Outage") return;
-        const rPx = (ring.outer_km / rMaxKm) * R_px;
-        ctx.fillStyle = MOD_COLOR[ring.modulation] || MOD_COLOR.Outage;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rPx, 0, 2 * Math.PI);
-        ctx.fill();
+      zoneData.zones.forEach((zone, idx) => {
+        const cx = centers[idx];
+        const isSelectedFreq = zone.freq_mhz === state.freq_mhz;
+
+        mctx.fillStyle = MOD_COLOR.Outage;
+        mctx.beginPath();
+        mctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
+        mctx.fill();
+
+        const sortedRings = [...zone.rings].sort((a, b) => b.outer_km - a.outer_km);
+        sortedRings.forEach((ring) => {
+          if (ring.modulation === "Outage") return;
+          const rPx = (ring.outer_km / rMaxKm) * R_px;
+          mctx.fillStyle = MOD_COLOR[ring.modulation] || MOD_COLOR.Outage;
+          mctx.beginPath();
+          mctx.arc(cx, cy, rPx, 0, 2 * Math.PI);
+          mctx.fill();
+        });
+
+        mctx.strokeStyle = isSelectedFreq ? "#0F2A47" : "#334155";
+        mctx.lineWidth = isSelectedFreq ? 1.8 : 1.3;
+        mctx.beginPath();
+        mctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
+        mctx.stroke();
+
+        if (state.show_reliability) {
+          if (zone.radius_stochastic_km > 0) {
+            mctx.save();
+            mctx.setLineDash([5, 4]);
+            mctx.strokeStyle = "rgba(15, 42, 71, 0.78)";
+            mctx.lineWidth = 1.7;
+            mctx.beginPath();
+            mctx.arc(cx, cy, (zone.radius_stochastic_km / rMaxKm) * R_px, 0, 2 * Math.PI);
+            mctx.stroke();
+            mctx.restore();
+          }
+          if (zone.radius_fading_km > 0) {
+            mctx.save();
+            mctx.setLineDash([2, 3]);
+            mctx.strokeStyle = "rgba(180, 83, 9, 0.9)";
+            mctx.lineWidth = 1.9;
+            mctx.beginPath();
+            mctx.arc(cx, cy, (zone.radius_fading_km / rMaxKm) * R_px, 0, 2 * Math.PI);
+            mctx.stroke();
+            mctx.restore();
+          }
+        }
+
+        mctx.fillStyle = isSelectedFreq ? "#0F2A47" : "#334155";
+        mctx.font = "bold 12.5px sans-serif";
+        mctx.textAlign = "center";
+        const freqTag = isSelectedFreq ? " · Aktif" : "";
+        mctx.fillText(`${zone.freq_mhz} MHz${freqTag}`, cx, 20);
+
+        mctx.fillStyle = "#475569";
+        mctx.font = "11px sans-serif";
+        mctx.fillText(
+          `Median: ${zone.radius_median_label} · Andal 95%: ${zone.radius_fading_label}`,
+          cx,
+          H - 10
+        );
       });
 
-      // Simple clean outer boundary
-      ctx.strokeStyle = isSelectedFreq ? "#0F2A47" : "#334155";
-      ctx.lineWidth = isSelectedFreq ? 1.8 : 1.3;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
-      ctx.stroke();
+      mapStaticKey = nextMapKey;
+    }
 
-      // Optional 95% reliability rings (OFF by default)
-      if (state.show_reliability) {
-        if (zone.radius_stochastic_km > 0) {
-          ctx.save();
-          ctx.setLineDash([5, 4]);
-          ctx.strokeStyle = "rgba(15, 42, 71, 0.78)";
-          ctx.lineWidth = 1.7;
-          ctx.beginPath();
-          ctx.arc(cx, cy, (zone.radius_stochastic_km / rMaxKm) * R_px, 0, 2 * Math.PI);
-          ctx.stroke();
-          ctx.restore();
-        }
-        if (zone.radius_fading_km > 0) {
-          ctx.save();
-          ctx.setLineDash([2, 3]);
-          ctx.strokeStyle = "rgba(180, 83, 9, 0.9)";
-          ctx.lineWidth = 1.9;
-          ctx.beginPath();
-          ctx.arc(cx, cy, (zone.radius_fading_km / rMaxKm) * R_px, 0, 2 * Math.PI);
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
+    ctx.drawImage(mapStaticCanvas, 0, 0, W, H);
 
-      // Subtle BTS-to-UE radial guide + BTS center + UE marker
+    // Lightweight dynamic layer: BTS-to-UE guide, BTS center, UE marker
+    zoneData.zones.forEach((_, idx) => {
+      const cx = centers[idx];
       const uePx = cx + (state.dist_km / rMaxKm) * R_px;
       ctx.strokeStyle = "rgba(15, 23, 42, 0.28)";
       ctx.lineWidth = 1.1;
@@ -764,7 +849,6 @@
       ctx.lineTo(uePx, cy);
       ctx.stroke();
 
-      // BTS center marker
       ctx.fillStyle = "#FFFFFF";
       ctx.strokeStyle = "#0F172A";
       ctx.lineWidth = 2;
@@ -773,7 +857,6 @@
       ctx.fill();
       ctx.stroke();
 
-      // UE position marker (matches draggable yellow SNR operating point)
       ctx.fillStyle = "#F59E0B";
       ctx.strokeStyle = "#0F172A";
       ctx.lineWidth = 1.8;
@@ -781,21 +864,6 @@
       ctx.arc(uePx, cy, 4.8, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
-
-      // Clean mini-map title & radius summary
-      ctx.fillStyle = isSelectedFreq ? "#0F2A47" : "#334155";
-      ctx.font = "bold 12.5px sans-serif";
-      ctx.textAlign = "center";
-      const freqTag = isSelectedFreq ? " · Aktif" : "";
-      ctx.fillText(`${zone.freq_mhz} MHz${freqTag}`, cx, 20);
-
-      ctx.fillStyle = "#475569";
-      ctx.font = "11px sans-serif";
-      ctx.fillText(
-        `Median: ${zone.radius_median_label} · Andal 95%: ${zone.radius_fading_label}`,
-        cx,
-        H - 10
-      );
     });
   }
 
@@ -868,8 +936,11 @@
 
   function invalidateMcView() {
     if (lastValidMcResult && lastValidMcKey !== currentMcParamKey()) {
-      mcStatusMode = state.live_mc ? "updating" : "stale";
-      renderMcStats();
+      const nextMode = state.live_mc ? "updating" : "stale";
+      if (mcStatusMode !== nextMode) {
+        mcStatusMode = nextMode;
+        renderMcStats();
+      }
     }
   }
 
@@ -1089,7 +1160,7 @@
     if (dragRafId !== null) return;
     dragRafId = requestAnimationFrame(() => {
       dragRafId = null;
-      syncControlsFromState();
+      syncDragReadouts();
       if (lastOpData) drawSnrChart(lastOpData);
       if (lastZonesData) drawCoverageMap(lastZonesData);
     });
@@ -1098,7 +1169,9 @@
   async function refreshAllWorkbench(mode) {
     // mode: "discrete" | "drag_move" | "drag_settle"
     const seq = ++workbenchSeq;
-    syncControlsFromState();
+    if (mode !== "drag_move") {
+      syncControlsFromState();
+    }
     invalidateMcView();
 
     if (mode === "drag_move") {
