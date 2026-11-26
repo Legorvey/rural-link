@@ -279,5 +279,50 @@ def test_native_web_ui_cleanup_contract():
     assert 'id="mcPairSummary"' not in html
     assert 'id="chkShowReliability"' in html
     assert 'id="chkLiveMc" checked' in html
+    assert "perubahan jumlah Resource Block" in html
     for tab_id in ("panelWorkbench", "panelResults", "panelMethodology", "panelEncyclopedia"):
         assert f'id="{tab_id}"' in html
+
+
+@pytest.mark.parametrize("zone_strategy", ["S0", "S1", "S2", "S3", "R0"])
+def test_radial_zone_invariants_and_src_parity(zone_strategy: str):
+    resp = client.post(
+        "/api/stochastic-analysis",
+        json={
+            "freq_mhz": 900,
+            "env": "NLOS",
+            "dist_km": 5.0,
+            "tx_power_dbm": 23.0,
+            "ber_target": 1e-2,
+            "active_strategy": "S3",
+            "zone_strategy": zone_strategy,
+            "include_zones": True,
+        },
+    )
+    assert resp.status_code == 200
+    zones = resp.json()["zones"]
+    assert len(zones) == 3
+
+    mod_rank = {"64-QAM": 6, "16-QAM": 4, "QPSK": 2, "BPSK": 1, "Outage": 0}
+    grid = np.round(np.arange(1.0, 12.25, 0.25), 4)
+    curves = evaluate_scenario_curves(900.0, "NLOS", grid, n_draws=5000, seed=42)
+    summary = summarize_coverage(curves)
+    s_row = summary[summary.scenario == zone_strategy].iloc[0]
+
+    z900 = [z for z in zones if z["freq_mhz"] == 900][0]
+    assert z900["scenario"] == zone_strategy
+    assert z900["radius_median_label"] == s_row["radius_median_label"]
+    assert z900["radius_stochastic_label"] == s_row["radius_stochastic_label"]
+    assert z900["radius_fading_label"] == s_row["radius_fading_label"]
+
+    for z in zones:
+        mods = [r["modulation"] for r in z["rings"]]
+        if zone_strategy == "S0":
+            assert set(mods) <= {"QPSK", "Outage"}
+        elif zone_strategy == "S1":
+            ranks = [mod_rank[m] for m in mods]
+            assert ranks == sorted(ranks, reverse=True)
+        elif zone_strategy == "S2":
+            assert set(mods) <= {"QPSK", "Outage"}
+        elif zone_strategy == "R0":
+            assert set(mods) <= {"BPSK", "Outage"}

@@ -314,14 +314,16 @@
   }
 
   function renderStochastic(data, zoneKey) {
-    if (data.zones) {
-      lastZonesData = {
-        zones: data.zones,
-        freq_summary_s3: data.freq_summary_s3,
-      };
-      zoneCache.set(zoneKey, lastZonesData);
-    } else if (zoneCache.has(zoneKey)) {
-      lastZonesData = zoneCache.get(zoneKey);
+    if (zoneKey === currentZoneKey()) {
+      if (data.zones) {
+        lastZonesData = {
+          zones: data.zones,
+          freq_summary_s3: data.freq_summary_s3,
+        };
+        zoneCache.set(zoneKey, lastZonesData);
+      } else if (zoneCache.has(zoneKey)) {
+        lastZonesData = zoneCache.get(zoneKey);
+      }
     }
 
     lastStochDistData = {
@@ -784,11 +786,7 @@
       ctx.fillStyle = isSelectedFreq ? "#0F2A47" : "#334155";
       ctx.font = "bold 12.5px sans-serif";
       ctx.textAlign = "center";
-      const freqTag = isSelectedFreq
-        ? " · Aktif"
-        : zone.freq_mhz === 700
-          ? " · Suplemen"
-          : "";
+      const freqTag = isSelectedFreq ? " · Aktif" : "";
       ctx.fillText(`${zone.freq_mhz} MHz${freqTag}`, cx, 20);
 
       ctx.fillStyle = "#475569";
@@ -961,8 +959,13 @@
         body: JSON.stringify(payload),
         signal: stochController.signal,
       });
-      if (seq !== stochSeq) return;
-      stochDistCache.set(distCacheKey, data);
+      if (seq !== stochSeq || zoneKey !== currentZoneKey()) return;
+      // Cache only distance-dependent fields so zones are never cross-contaminated across zone_strategy
+      stochDistCache.set(distCacheKey, {
+        active_outage: data.active_outage,
+        strategy_comparison: data.strategy_comparison,
+        freq_summary_s3: data.freq_summary_s3,
+      });
       renderStochastic(data, zoneKey);
     } catch (err) {
       if (err.name === "AbortError" || seq !== stochSeq) return;
@@ -1632,7 +1635,8 @@
 
   document.getElementById("selZoneStrat").addEventListener("change", (e) => {
     state.zone_strategy = e.target.value;
-    refreshAllWorkbench("discrete");
+    syncControlsFromState();
+    refreshStochastic();
   });
 
   document.getElementById("chkShowReliability").addEventListener("change", (e) => {
@@ -1640,8 +1644,8 @@
     const cap = document.getElementById("mapCaption");
     if (cap) {
       cap.textContent = state.show_reliability
-        ? "Zona warna: median PL · Garis putus navy: batas 95% shadowing · Garis titik amber: batas 95% (+Rayleigh CSI)."
-        : "Zona warna menunjukkan jangkauan median (THEORETICAL, radius 1–12 km) · Pusat: BTS · Titik kuning: posisi UE.";
+        ? "Zona warna: median PL · Putus navy: batas 95% shadowing · Titik amber: batas 95% (+Rayleigh CSI) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block."
+        : "Zona warna: median PL (1–12 km) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block.";
     }
     if (lastZonesData) drawCoverageMap(lastZonesData);
   });
