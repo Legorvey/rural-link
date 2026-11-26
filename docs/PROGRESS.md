@@ -94,3 +94,13 @@ All reference PDFs in `references/` inspected and recorded in `docs/REFERENCES.m
 - **Phase 05:** `app.py` Streamlit workbench (left rail, telemetry strip, coverage zones, operating points, bit-level MC with engine constellation samples, method tab); `tests/test_app.py` AppTest smoke tests; light theme in `.streamlit/config.toml`.
 - **Checks:** pytest 91 passed, ruff check and format clean.
 - **Pending:** Phase 06 final audit and Phase 07 deployment (not started, no merge).
+
+---
+
+## Phase 06 targeted audit: COMPLETE (2026-11-26)
+- **Defect fixed:** Phase 05 evaluated only slow (shadowing) adaptation. Added instantaneous-CSI evaluation: per shared Rayleigh+shadowing realization the max-rate option meeting the AWGN Eb/N0 threshold is chosen; BER is the conditional AWGN BER (max 1e-2 by construction). The earlier 4-7 % BER is the no-CSI average Rayleigh BER at slow-selected points (clarified in `outputs/summary.md`).
+- **Fixed:** radii now reported as `<1 km` (no coverage at first tested point) and `>=12 km` (right-censored); added R0 fixed BPSK/1 RB reference; outage-adjusted effective rate (outage = 0) exported.
+- **Verified unchanged:** shared realizations across scenarios, Es/N0 to Eb/N0 conversion (k = log2 M), 23 dBm cap, UI values from `src/` only.
+- **Exports:** `adaptive_coverage_curves.csv`, `adaptive_coverage_summary.csv`, `adaptive_strategy_comparison.csv`, `adaptive_mc_validation.csv`, `outputs/summary.md`.
+- **Checks:** pytest 93 passed (incl. AppTest), ruff clean, experiments rerun.
+- **Pending:** Phase 07 deployment (not started, no merge).

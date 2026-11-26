@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from config import DEFAULT_CONFIG, SimulationConfig
+from src.channels import rayleigh_fading_gains
 from src.link_budget import active_bandwidth_hz, compute_link_budget, nominal_data_rate_bps
 from src.metrics import simulate_ber_point
 from src.modulation import (
@@ -30,6 +31,13 @@ SCENARIOS: dict[str, dict] = {
     "S1": {"label": "Adaptive modulation, 25 RB", "adapt_mod": True, "adapt_rb": False},
     "S2": {"label": "Adaptive bandwidth, QPSK", "adapt_mod": False, "adapt_rb": True},
     "S3": {"label": "Joint adaptive", "adapt_mod": True, "adapt_rb": True},
+    "R0": {
+        "label": "Fixed BPSK, 1 RB (robust reference)",
+        "adapt_mod": False,
+        "adapt_rb": False,
+        "fixed_mod": "BPSK",
+        "fixed_rb": 1,
+    },
 }
 BASELINE_MOD = "QPSK"
 
@@ -50,9 +58,11 @@ def scenario_options(
     if scenario not in SCENARIOS:
         raise ValueError(f"Unknown scenario {scenario!r}.")
     spec = SCENARIOS[scenario]
-    mods = cfg.modulations if spec["adapt_mod"] else (BASELINE_MOD,)
+    mods = cfg.modulations if spec["adapt_mod"] else (spec.get("fixed_mod", BASELINE_MOD),)
     rbs = (
-        tuple(sorted(cfg.active_rb_choices)) if spec["adapt_rb"] else (max(cfg.active_rb_choices),)
+        tuple(sorted(cfg.active_rb_choices))
+        if spec["adapt_rb"]
+        else (spec.get("fixed_rb", max(cfg.active_rb_choices)),)
     )
     return [(m, rb) for rb in rbs for m in mods]
 
@@ -103,6 +113,30 @@ def select_operating_point(
     )
 
 
+def conditional_ber(sel: Selection, thr: dict[str, dict[str, float]]) -> np.ndarray:
+    """Conditional AWGN BER at the instantaneous Eb/N0 of the chosen option (NaN in outage).
+
+    With instantaneous CSI the receiver is AWGN-like during each realization, so the BER given
+    that realization is the exact AWGN BER at its Eb/N0. It is not the Rayleigh average BER.
+    """
+    ber = np.full(sel.index.shape, np.nan)
+    for i, (mod, _) in enumerate(sel.options):
+        m = sel.index == i
+        if np.any(m):
+            ebn0_db = sel.ebn0_margin_db[m] + thr[mod]["ebn0_db"]
+            ber[m] = theoretical_ber_awgn(10.0 ** (ebn0_db / 10.0), mod)
+    return ber
+
+
+def radius_label(radius_km: float, censored: bool, d_min: float, d_max: float) -> str:
+    """Report <d_min for no coverage at the first tested point, >=d_max for right-censored."""
+    if radius_km <= 0.0:
+        return f"<{d_min:g} km"
+    if censored:
+        return f">={d_max:g} km"
+    return f"{radius_km:g} km"
+
+
 def coverage_radius_km(distance_km: np.ndarray, ok: np.ndarray) -> tuple[float, bool]:
     """Largest distance reached with unbroken coverage from the first grid point.
 
@@ -141,6 +175,11 @@ def evaluate_scenario_curves(
     pl_med = np.asarray(median_path_loss_db(d * 1000.0, freq_mhz, environment), dtype=float)
     rng = np.random.default_rng(seed)
     shadow = rng.normal(0.0, sigma, size=(d.size, n_draws))
+    # One shared set of shadowing and Rayleigh power-gain realizations for every scenario.
+    fade_db = 10.0 * np.log10(
+        np.abs(rayleigh_fading_gains(d.size * n_draws, rng)).reshape(d.size, n_draws) ** 2
+    )
+    pl_fast = (pl_med[:, None] + shadow - fade_db).ravel()
     rows = []
     for sc in scenarios:
         sel_med = select_operating_point(pl_med, sc, tx_power_dbm, cfg, thr)
@@ -149,6 +188,9 @@ def evaluate_scenario_curves(
             (pl_med[:, None] + shadow).ravel(), sc, tx_power_dbm, cfg, thr
         )
         shd_rate = sel_shd.rate_bps.reshape(d.size, n_draws)
+        sel_fst = select_operating_point(pl_fast, sc, tx_power_dbm, cfg, thr)
+        fst_rate = sel_fst.rate_bps.reshape(d.size, n_draws)
+        fst_ber = conditional_ber(sel_fst, thr).reshape(d.size, n_draws)
         for j, dist in enumerate(d):
             idx = sel_med.index[j]
             mod, rb = sel_med.options[idx] if idx >= 0 else ("none", 0)
@@ -167,6 +209,14 @@ def evaluate_scenario_curves(
                     "margin95_rate_bps": float(sel_mar.rate_bps[j]),
                     "shadow_outage_prob": float(np.mean(shd_rate[j] == 0.0)),
                     "shadow_mean_rate_bps": float(np.mean(shd_rate[j])),
+                    "fading_outage_prob": float(np.mean(fst_rate[j] == 0.0)),
+                    "fading_effective_rate_bps": float(np.mean(fst_rate[j])),
+                    "fading_cond_ber_mean": (
+                        float(np.nanmean(fst_ber[j])) if np.any(fst_rate[j] > 0) else float("nan")
+                    ),
+                    "fading_cond_ber_max": (
+                        float(np.nanmax(fst_ber[j])) if np.any(fst_rate[j] > 0) else float("nan")
+                    ),
                 }
             )
     return pd.DataFrame(rows)
@@ -180,23 +230,26 @@ def summarize_coverage(
     for (f, env, sc), g in curves.groupby(["freq_mhz", "environment", "scenario"], sort=False):
         g = g.sort_values("distance_km")
         d = g["distance_km"].to_numpy()
-        r_med, c_med = coverage_radius_km(d, g["median_feasible"].to_numpy())
-        r_mar, c_mar = coverage_radius_km(d, g["margin95_feasible"].to_numpy())
-        r_sto, c_sto = coverage_radius_km(
-            d, (g["shadow_outage_prob"] <= cfg.outage_target).to_numpy()
-        )
-        out.append(
-            {
-                "freq_mhz": f,
-                "environment": env,
-                "scenario": sc,
-                "label": SCENARIOS[sc]["label"],
-                "radius_median_km": r_med,
-                "radius_margin95_km": r_mar,
-                "radius_stochastic_km": r_sto,
-                "censored_at_grid_end": bool(c_med or c_mar or c_sto),
-            }
-        )
+        crit = {
+            "median": g["median_feasible"].to_numpy(),
+            "margin95": g["margin95_feasible"].to_numpy(),
+            "stochastic": (g["shadow_outage_prob"] <= cfg.outage_target).to_numpy(),
+            "fading": (g["fading_outage_prob"] <= cfg.outage_target).to_numpy(),
+        }
+        row = {
+            "freq_mhz": f,
+            "environment": env,
+            "scenario": sc,
+            "label": SCENARIOS[sc]["label"],
+        }
+        any_cens = False
+        for name, ok in crit.items():
+            r, c = coverage_radius_km(d, ok)
+            row[f"radius_{name}_km"] = r
+            row[f"radius_{name}_label"] = radius_label(r, c, float(d[0]), float(d[-1]))
+            any_cens = any_cens or c
+        row["censored_at_grid_end"] = bool(any_cens)
+        out.append(row)
     return pd.DataFrame(out)
 
 

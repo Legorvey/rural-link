@@ -94,3 +94,30 @@ def test_mc_validation_matches_theory_and_returns_engine_samples():
     assert v["mc_ber_rayleigh"] > 5 * v["mc_ber_awgn"]
     assert v["samples_awgn"].shape == (100,) and v["samples_rayleigh"].shape == (100,)
     assert SCENARIOS["S3"]["adapt_mod"] and SCENARIOS["S3"]["adapt_rb"]
+
+
+def test_fixed_bpsk_1rb_reference_and_labels():
+    from src.adaptive import radius_label
+
+    assert scenario_options("R0") == [("BPSK", 1)]
+    assert radius_label(0.0, False, 1.0, 12.0) == "<1 km"
+    assert radius_label(12.0, True, 1.0, 12.0) == ">=12 km"
+    assert radius_label(3.25, False, 1.0, 12.0) == "3.25 km"
+
+
+def test_instantaneous_csi_conditional_ber_and_shared_realizations():
+    c = evaluate_scenario_curves(1800.0, "NLOS", D, n_draws=500, seed=11)
+    served = c.dropna(subset=["fading_cond_ber_max"])
+    assert len(served) > 0
+    assert served.fading_cond_ber_max.max() <= DEFAULT_CONFIG.ber_target + 1e-12
+    p = c.pivot(index="distance_km", columns="scenario")
+    for other in ("S0", "S1", "S2", "R0"):
+        assert (p["fading_outage_prob"]["S3"] <= p["fading_outage_prob"][other] + 1e-12).all()
+        assert (
+            p["fading_effective_rate_bps"]["S3"] >= p["fading_effective_rate_bps"][other] - 1e-6
+        ).all()
+    # R0 is the most robust fixed option: it cannot have more outage than S0
+    assert (p["fading_outage_prob"]["R0"] <= p["fading_outage_prob"]["S0"] + 1e-12).all()
+    # fading adds outage relative to shadowing alone
+    s3 = c[c.scenario == "S3"]
+    assert (s3.fading_outage_prob >= s3.shadow_outage_prob - 0.05).all()

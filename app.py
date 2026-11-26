@@ -187,7 +187,7 @@ with tab_cov:
             "bars apply seeded log-normal shadowing and require outage of 5% or less."
         )
     with right:
-        st.subheader("Shadow outage and mean rate vs distance")
+        st.subheader(f"Outage vs distance, {ref_sc}")
         g = curves[(curves.environment == env) & (curves.scenario == ref_sc)]
         fig2 = go.Figure()
         for f, color in zip(CFG.carrier_frequencies_mhz, (TEAL, GREY), strict=True):
@@ -195,8 +195,14 @@ with tab_cov:
             fig2.add_scatter(
                 x=h.distance_km,
                 y=h.shadow_outage_prob * 100,
-                name=f"{f:.0f} MHz outage %",
+                name=f"{f:.0f} MHz shadowing",
                 line=dict(color=color),
+            )
+            fig2.add_scatter(
+                x=h.distance_km,
+                y=h.fading_outage_prob * 100,
+                name=f"{f:.0f} MHz shadowing + Rayleigh (CSI)",
+                line=dict(color=color, dash="dash"),
             )
         fig2.add_hline(
             y=CFG.outage_target * 100,
@@ -214,11 +220,21 @@ with tab_cov:
         )
         st.plotly_chart(fig2, width="stretch")
     st.dataframe(
-        s.drop(columns="label").rename(
+        s[
+            [
+                "freq_mhz",
+                "scenario",
+                "radius_median_label",
+                "radius_margin95_label",
+                "radius_stochastic_label",
+                "radius_fading_label",
+            ]
+        ].rename(
             columns={
-                "radius_median_km": "median PL (km)",
-                "radius_margin95_km": "95% margin (km)",
-                "radius_stochastic_km": "outage<=5% (km)",
+                "radius_median_label": "median PL",
+                "radius_margin95_label": "95% margin",
+                "radius_stochastic_label": "shadowing outage<=5%",
+                "radius_fading_label": "shadowing+Rayleigh outage<=5%",
             }
         ),
         hide_index=True,
