@@ -26,6 +26,16 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from config import DEFAULT_CONFIG, PROJECT_NAME, RESEARCH_TITLE, SimulationConfig
+from glossary_data import (
+    CATEGORIES as GLOSSARY_CATEGORIES,
+)
+from glossary_data import (
+    ENTRIES as GLOSSARY_ENTRIES,
+)
+from glossary_data import (
+    glossary_csv_bytes,
+    glossary_dataframe,
+)
 from src.adaptive import (
     SCENARIOS,
     evaluate_scenario_curves,
@@ -389,8 +399,13 @@ except ValueError as exc:
 
 is_exploratory = (freq == 700.0) or not np.isclose(ber_target, CFG.ber_target)
 
-tab_wb, tab_res, tab_met = st.tabs(
-    ["A. Workbench interaktif", "B. Hasil penelitian (CSV & PNG)", "C. Metodologi & Batasan"]
+tab_wb, tab_res, tab_met, tab_dic = st.tabs(
+    [
+        "A. Workbench interaktif",
+        "B. Hasil penelitian (CSV & PNG)",
+        "C. Metodologi & Batasan",
+        "D. Kamus & Persamaan",
+    ]
 )
 
 
@@ -1169,3 +1184,48 @@ with tab_met:
         "(`prototypes/dashboard_rurallink.html`, riwayat Git asli dipertahankan). Integrasi ke Streamlit dan seluruh perhitungan berasal dari "
         f"mesin Python tim. Tim: {TEAM}."
     )
+
+# ================================================================== D. ENCYCLOPEDIA
+with tab_dic:
+    st.markdown("#### Ensiklopedia RuralLink")
+    st.markdown(
+        '<div class="rl-note">Referensi istilah, singkatan, persamaan, satuan, dan batasan riset untuk '
+        "persiapan presentasi dan ujian lisan Kelompok 1. Seluruh persamaan selaras dengan mesin ilmiah "
+        "tervalidasi (<code>src/</code>) dan berstatus eksplisit: <i>Diimplementasikan di RuralLink</i>, "
+        "<i>Latar belakang teoretis</i>, atau <i>Konteks literatur / tidak diimplementasikan</i>.</div>",
+        unsafe_allow_html=True,
+    )
+    g_col1, g_col2, g_col3 = st.columns([1.4, 1.2, 0.8])
+    g_query = g_col1.text_input(
+        "Cari istilah, kepanjangan, definisi, atau persamaan",
+        key="gloss_q",
+        placeholder="mis. Eb/N0, Wilson, 700 MHz, CSI...",
+    )
+    g_cat = g_col2.selectbox(
+        "Kategori",
+        ["Semua kategori", *GLOSSARY_CATEGORIES],
+        key="gloss_cat",
+    )
+    g_col3.markdown("<div style='height:1.72rem'></div>", unsafe_allow_html=True)
+    g_col3.download_button(
+        "Unduh CSV kamus",
+        glossary_csv_bytes(),
+        "rurallink_ensiklopedia.csv",
+        "text/csv",
+        key="dl_glossary",
+        width="stretch",
+    )
+    gdf = glossary_dataframe(g_cat, g_query)
+    st.caption(
+        f"Menampilkan **{len(gdf)}** dari **{len(GLOSSARY_ENTRIES)}** istilah "
+        f"({len(GLOSSARY_CATEGORIES)} kategori)."
+    )
+    if gdf.empty:
+        st.info("Tidak ada entri yang cocok dengan kata kunci atau kategori tersebut.")
+    elif g_cat == "Semua kategori" and not g_query.strip():
+        for idx, cat_name in enumerate(GLOSSARY_CATEGORIES):
+            sub = glossary_dataframe(cat_name, "")
+            with st.expander(f"{cat_name} ({len(sub)} istilah)", expanded=(idx == 0)):
+                st.table(sub)
+    else:
+        st.table(gdf)

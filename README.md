@@ -95,7 +95,7 @@ Buka [https://rural-link.streamlit.app/](https://rural-link.streamlit.app/) di b
 3. Bandingkan frekuensi **900** dan **1800** MHz pada kontrol *segmented*, ubah lingkungan (`LOS` / `NLOS`), dan geser jarak (`1–12 km`).
 4. Klik **Jalankan Monte Carlo** untuk menjalankan transmisi bit acak aktual dan membandingkan konstelasi I/Q nyata (**Dioptimalkan vs S0** maupun **Antar Frekuensi**).
 5. (Opsional) Uji target BER `1e-3` atau frekuensi `700 MHz` langsung dari panel kiri (suplemen eksploratori terinspirasi Reddy 2022, bukan replikasi Reddy, dan tidak mengubah `outputs/`).
-6. Buka tab **B. Hasil penelitian (CSV & PNG)** untuk melihat grafik publikasi serta mengunduh file `.csv` maupun `.png`, dan tab **C. Metodologi & Batasan** untuk persamaan matematis.
+6. Buka tab **B. Hasil penelitian (CSV & PNG)** untuk melihat grafik publikasi serta mengunduh file `.csv` maupun `.png`, tab **C. Metodologi & Batasan** untuk persamaan matematis, dan tab **D. Kamus & Persamaan** (**Ensiklopedia RuralLink**) untuk referensi istilah dan persamaan lengkap.
 
 ---
 
