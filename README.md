@@ -1,178 +1,164 @@
 <div align="center">
 
-<img src="docs/assets/rurallink-mark.svg" alt="Logo RuralLink: menara radio minimal dengan gelombang sinyal di atas kontur wilayah pedesaan" width="96"/>
+<img src="docs/assets/rurallink-mark.svg" alt="RuralLink logo: minimal radio tower with signal waves over rural terrain" width="96"/>
 
 # RuralLink
 
-### Adaptive Uplink Coverage Simulator (700 / 900 / 1800 MHz)
+**Adaptive Uplink Coverage Simulator for Rural & 3T Indonesia (700 / 900 / 1800 MHz)**
 
-*Analisis Peningkatan Jangkauan Uplink melalui Modulasi Adaptif dan Alokasi Bandwidth pada Frekuensi 900 MHz dan 1800 MHz di Wilayah 3T Indonesia.*
+[![Static Dashboard](https://img.shields.io/badge/Interface-Static_HTML_Dashboard-0f766e?style=flat-square)](https://rural-uplink.vercel.app/)
+[![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)](public/index.html)
+[![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white)](public/index.html)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](public/index.html)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](src/)
+[![Pytest](https://img.shields.io/badge/Tested_with-Pytest-0A9EDC?style=flat-square&logo=pytest&logoColor=white)](tests/)
+[![Ruff](https://img.shields.io/badge/Linted_with-Ruff-D7FF64?style=flat-square&logo=ruff&logoColor=black)](pyproject.toml)
+[![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://rural-uplink.vercel.app/)
 
-**Kelompok 1 — Sistem Komunikasi Digital (2026)** | Dosen Pengampu: **Bu Dessy**  
-S1 Teknik Elektro FMIPA Universitas Padjadjaran
-
-*Website statis murni tanpa backend: dapat dijalankan dari hosting statis maupun langsung offline di browser.*  
-*Legacy backup (arsip Streamlit):* [`https://rural-link.streamlit.app/`](https://rural-link.streamlit.app/) *(bukan rilis aktif utama)*
-
-[Masalah Penelitian](#permasalahan-penelitian) · [Dua Lapisan Sistem](#pemisahan-website-dan-mesin-riset) · [Fitur & Tab Website](#fitur-simulator-dan-empat-tab-aplikasi) · [Temuan Terverifikasi](#temuan-numerik-terverifikasi) · [Penggunaan Offline & Reproduksi Python](#penggunaan-offline-dan-reproduksi-riset-python) · [Tim & Kredit](#tim-dan-kredit) · [Referensi](#referensi-dan-batasan)
+[Live Demo](#-live-demo) · [What It Does](#-what-this-project-does) · [Dashboard Overview](#-main-interface-overview) · [Key Concepts](#-key-concepts-covered) · [Run Locally](#-how-to-run-locally) · [Reproducibility](#-reproducibility--research-notes) · [Team](#-team--credits)
 
 </div>
 
 ---
 
-## Permasalahan Penelitian
+## Live Demo
 
-**RuralLink** mengevaluasi batas jangkauan komunikasi *uplink* (User Equipment/UE ke Base Transceiver Station/BTS) pada wilayah pedesaan dan 3T (Tertinggal, Terdepan, Terluar) di Indonesia.
-
-- **Kesenjangan cakupan 3T:** Laporan Kinerja Komdigi (2025) mencatat cakupan 4G Q2 2025 mencapai `98,95%` populasi, tetapi baru menjangkau `53,82%` luas wilayah daratan (dengan `6.747` lokasi BTS beroperasi di wilayah 3T).
-- **Keterbatasan daya *uplink*:** Pada sel pedesaan beradius besar (`1–12 km`), daya pancar UE dibatasi `23 dBm` (`200 mW`), jauh di bawah daya pancar BTS. Akibatnya, tautan *uplink* lebih cepat mengalami *outage* saat jarak bertambah atau terjadi halangan (`NLOS` dan *shadowing*).
-- **Peran alokasi *Resource Block* (`N_RB`):** Dengan daya total UE tetap, mempersempit alokasi dari `25 RB` (`4,50 MHz`) ke `1 RB` (`180 kHz`) menurunkan *noise floor* termal penerima dan menaikkan SNR teoretis sebesar **`13,98 dB`**, dengan kompromi penurunan laju data nominal.
-- **Peran modulasi adaptif:** Memilih modulasi (`BPSK`, `QPSK`, `16-QAM`, `64-QAM`) sesuai kondisi kanal menjaga target $\text{BER} \le 10^{-2}$ tanpa mengorbankan laju data saat kanal dekat BTS masih baik.
+- **Primary Web App:** [https://rural-uplink.vercel.app/](https://rural-uplink.vercel.app/)
+- **Format:** Pure static HTML dashboard (`public/index.html`, identical to `dashboard_rurallink.html`). It runs entirely in the browser with no backend, no database, and no external API calls.
 
 ---
 
-## Pemisahan Website dan Mesin Riset
+## What This Project Does
 
-Repositori ini memisahkan secara tegas **antarmuka website statis** dan **mesin simulasi ilmiah Python**:
+**RuralLink** models uplink communication limits—from a user device (User Equipment / UE) to a cellular base station (BTS)—in rural and 3T (*Tertinggal, Terdepan, Terluar*) regions of Indonesia.
 
-| Aspek | 1. Website Statis Interaktif (`public/index.html`) | 2. Mesin Riset Python (`src/` & `experiments/`) |
-|---|---|---|
-| **Implementasi** | HTML/CSS/JavaScript mandiri karya **Zahran** (`dashboard_rurallink.html` → `public/index.html`) | Python 3.12 (`config.py`, `src/*.py`, `experiments/*.py`) |
-| **Jenis Perhitungan** | **Analitis real-time di browser** (aproksimasi `erfc` untuk kurva BER, peta radial 2D deterministik, visualisasi konstelasi 16-QAM ilustratif) | **Validasi ilmiah & Monte Carlo bit-level** (Cho–Yoon eksak, `5.000` realisasi *shared* shadowing + Rayleigh CSI, `1.000.000` bit MC, Wilson 95% CI, *hard cap* UE `23 dBm`) |
-| **Backend / API** | **Tidak ada** (100% sisi klien, tanpa server, tanpa database, tanpa request eksternal) | Eksekusi luring (*offline reproducible research*) untuk menghasilkan `outputs/` |
-| **Kesesuaian Hasil** | Tabel hasil di Tab 2 memuat ringkasan dari `outputs/`, sedangkan grafik & angka interaktif di Tab 1 dihitung langsung oleh JS analitis di browser | Sumber kanonik seluruh angka publikasi di `outputs/summary.md`, `outputs/results/*.csv`, dan `outputs/figures/*.png` |
+In large rural cells (1–12 km), the uplink is power-limited: a handheld UE is capped at **23 dBm (200 mW)**, far below a base station's transmit power. As distance increases or obstacles block the signal (Non-Line-of-Sight / NLOS), the uplink drops out long before the downlink does. According to Indonesia's Komdigi 2025 Performance Report, 4G reached 98.95% of the population in Q2 2025, but covered only 53.82% of land area.
 
-> **Catatan integritas:** Website HTML menggunakan perhitungan JavaScript analitis untuk interaktivitas instan dan **tidak** menjalankan simulasi Monte Carlo *bit-level* Python secara langsung.
+The simulator compares:
+- **Carrier frequencies:** **900 MHz** and **1800 MHz** (primary research), plus **700 MHz** (exploratory toggle in the dashboard).
+- **Propagation environments:** Line-of-Sight (**LOS**) vs. Non-Line-of-Sight (**NLOS**), and **AWGN** vs. **Rayleigh** fading.
+- **Five adaptation strategies (`S0–S3` and `R0`):**
 
----
-
-## Strategi `S0–S3` dan `R0`
-
-| Kode | Strategi | Modulasi | Alokasi RB | Peran Evaluasi |
+| Code | Strategy | Modulation | Resource Blocks (`N_RB`) | Evaluation Role |
 |---|---|---|---|---|
-| **S0** | Fixed baseline | `QPSK` tetap | `25 RB` (`4,50 MHz`) tetap | Pembanding standar tanpa adaptasi |
-| **S1** | Adaptive modulation | `BPSK`–`64-QAM` | `25 RB` tetap | Mengukur kontribusi adaptasi modulasi saja |
-| **S2** | Adaptive bandwidth | `QPSK` tetap | `1, 2, 5, 10, 25 RB` | Mengukur kontribusi penyempitan RB saja |
-| **S3** | Joint adaptive | `BPSK`–`64-QAM` | `1, 2, 5, 10, 25 RB` | Optimasi gabungan (laju nominal maks yang memenuhi target BER) |
-| **R0** | Robust reference | `BPSK` tetap | `1 RB` (`180 kHz`) tetap | Referensi ketahanan maksimum pada daya UE `23 dBm` |
+| **S0** | Fixed baseline | `QPSK` fixed | `25 RB` (`4.50 MHz`) fixed | Standard unadapted reference |
+| **S1** | Adaptive modulation | `BPSK`–`64-QAM` | `25 RB` fixed | Isolates the gain from modulation switching alone |
+| **S2** | Adaptive bandwidth | `QPSK` fixed | `1, 2, 5, 10, 25 RB` | Isolates the gain from narrowing bandwidth alone |
+| **S3** | Joint adaptive | `BPSK`–`64-QAM` | `1, 2, 5, 10, 25 RB` | Selects the highest nominal rate that still meets the BER target |
+| **R0** | Robust reference | `BPSK` fixed | `1 RB` (`180 kHz`) fixed | Maximum coverage reference at 23 dBm UE power |
 
-*(Website interaktif juga menyediakan mode `MANUAL` untuk mengunci jumlah `N_RB` pilihan pengguna.)*
-
----
-
-## Fitur Simulator dan Empat Tab Aplikasi
-
-### Cara Membuka Website
-- **Langsung *offline* (tanpa server / Python):** Buka `public/index.html` atau `dashboard_rurallink.html` langsung di browser (double-click).
-- **Melalui server statis lokal:**
-  ```powershell
-  python -m http.server --directory public 8000
-  ```
-  Lalu buka `http://127.0.0.1:8000/`.
-- **Deployment Vercel:** Dikonfigurasi sebagai situs statis murni dengan root `public/` di [vercel.json](vercel.json) (tanpa FastAPI, tanpa Python Functions, tanpa build step, dan tanpa environment variable). URL produksi Vercel akan ditambahkan setelah deployment dikonfirmasi.
-
-### Empat Tab Aplikasi
-1. **Simulator Interaktif:** Rail parameter kiri (`700 / 900 / 1800 MHz`, skenario `S0–S3 / R0 / MANUAL`, `N_RB`, `LOS / NLOS`, `Median / Margin 95%`, `AWGN / Rayleigh`, jarak `1,0–12,0 km`, daya `20–26 dBm` untuk eksplorasi sensitivitas), tabel perbandingan lintas frekuensi, *telemetry strip* 6 metrik, grafik **Uplink SNR vs Jarak**, visualisasi **Konstelasi I/Q**, dan **Peta Zona Cakupan Radial 2D**, beserta ekspor PNG & CSV.
-2. **Hasil Penelitian:** Ringkasan temuan dan tabel terverifikasi dari eksperimen Python (`adaptive_coverage_summary.csv`, `adaptive_strategy_comparison.csv`, `adaptive_mc_validation.csv`) dengan unduhan CSV.
-3. **Metodologi & Batasan:** Persamaan matematis inti (Close-In path loss, link budget, derau termal, $E_b/N_0$, laju nominal), parameter model, batasan penelitian, literatur, dan kredit tim.
-4. **Kamus & Persamaan (127):** Ensiklopedia 127 istilah dalam 10 kategori beserta pencarian, filter kategori, dan ekspor CSV.
+*(The interactive dashboard also includes a `MANUAL` mode to lock a custom `N_RB` value.)*
 
 ---
 
-## Temuan Numerik Terverifikasi
+## Main Interface Overview
 
-Seluruh nilai di bawah berasal dari eksekusi deterministik mesin Python (`experiments/run_experiments.py` dan `experiments/run_adaptive.py`, `seed = 42`, `5.000` realisasi bersama, `1.000.000` bit MC, `UE = 23 dBm`, target $\text{BER} = 10^{-2}$, target *outage* $5\%$, rentang `1–12 km`; lihat [outputs/summary.md](outputs/summary.md)):
+The canonical web interface is Zahran's standalone static HTML dashboard ([`public/index.html`](public/index.html) / [`dashboard_rurallink.html`](dashboard_rurallink.html)). It is organized into four tabs:
 
-### Validasi Teoretis & Monte Carlo (Fase 02–03)
-- **Selisih path loss 1800 vs 900 MHz (THEORETICAL):** **`6,0206 dB`** ($20\log_{10}(2)$).
-- **Penguatan SNR dari penyempitan RB (THEORETICAL):** `25 -> 1 RB` = **`+13,9794 dB`**; `25 -> 5 RB` = **`+6,9897 dB`**; *noise floor* `1 RB` = **`-117,447 dBm`**.
-- **Ambang AWGN di $\text{BER} = 10^{-2}$ (THEORETICAL, [modulation_thresholds.csv](outputs/results/modulation_thresholds.csv)):** `BPSK` $E_b/N_0 = 4,323\text{ dB}$ ($E_s/N_0 = 4,323\text{ dB}$); `QPSK` $E_b/N_0 = 4,323\text{ dB}$ ($E_s/N_0 = 7,333\text{ dB}$); `16-QAM` $E_b/N_0 = 7,882\text{ dB}$ ($E_s/N_0 = 13,903\text{ dB}$); `64-QAM` $E_b/N_0 = 11,954\text{ dB}$ ($E_s/N_0 = 19,735\text{ dB}$).
-
-### Perbandingan Radius Cakupan (km) ([adaptive_coverage_summary.csv](outputs/results/adaptive_coverage_summary.csv))
-| Frekuensi & Lingkungan | S0 (Median PL / Shadowing / +Rayleigh CSI) | S3 (Median PL / Shadowing / +Rayleigh CSI) | R0 (Median PL / Shadowing / +Rayleigh CSI) |
-|---|---|---|---|
-| **900 MHz LOS** | `>=12` / `8,75` / `3,5` | `>=12` / `>=12` / `>=12` | `>=12` / `>=12` / `>=12` |
-| **900 MHz NLOS** | `3,25` / `<1` / `<1` | `>=12` / `3` / `1,75` | `>=12` / `3` / `1,75` |
-| **1800 MHz LOS** | `8,25` / `4,75` / `1,75` | `>=12` / `>=12` / `11,25` | `>=12` / `>=12` / `11,25` |
-| **1800 MHz NLOS** | `2` / `<1` / `<1` | `9,25` / `1,5` / `1` | `9,25` / `1,5` / `1` |
-
-*(Label: `Median PL` = **THEORETICAL**; `Shadowing` dan `Shadowing + Rayleigh CSI` = **SIMULATED** dengan target outage $\le 5\%$. Nilai `<1 km` berarti gagal di titik uji awal 1 km; `>=12 km` berarti tersensor kanan di batas rentang evaluasi.)*
-
-### Kinerja Tepi Sel pada NLOS `2 km` (Shadowing + Rayleigh CSI, **SIMULATED**)
-- **900 MHz NLOS (`2 km`):** `S0` *outage* **`38,9%`** (laju efektif `5,50 Mbit/s`) $\rightarrow$ `S3` menekan *outage* menjadi **`5,7%`** sambil mempertahankan laju efektif **`11,97 Mbit/s`** (dibanding `R0`: *outage* `5,7%`, laju efektif `0,17 Mbit/s`).
-- **1800 MHz NLOS (`2 km`):** `S0` *outage* **`57,8%`** (laju efektif `3,79 Mbit/s`) $\rightarrow$ `S3` menekan *outage* menjadi **`12,0%`** dengan laju efektif **`7,79 Mbit/s`** (dibanding `R0`: `12,0%`, `0,16 Mbit/s`).
-
-### Batasan Penelitian
-- Model bersifat *link-level* tanpa *channel coding* (FEC), tanpa interferensi antar-sel, tanpa *power control* penuh, dan tanpa penjadwalan multi-user; laju nominal (`B_active * log2(M)`) bukan *throughput* jaringan LTE aktual.
-- Parameter CI (`n`, `sigma`) diekstrapolasi dari kampanye pengukuran 1400 MHz di Korea Selatan (Park et al., 2023) dan belum dikalibrasi dengan data pengukuran lapangan wilayah 3T Indonesia.
-- Visualisasi zona 2D bersifat radial hipotetis tanpa peta elevasi medan; estimasi jangkauan yang mencapai `12 km` bersifat tersensor kanan (`>=12 km`).
-- Frekuensi `700 MHz` dan daya `>23 dBm` pada HTML interaktif bersifat eksploratori/demonstratif; eksperimen Python kanonik hanya mengevaluasi `900/1800 MHz` dengan batas keras UE `<= 23 dBm`.
+1. **Interactive Simulator:** Left-hand parameter controls (`700 / 900 / 1800 MHz`, strategy `S0–S3 / R0 / MANUAL`, `N_RB`, `LOS / NLOS`, `Median / 95% Margin`, `AWGN / Rayleigh`, distance `1.0–12.0 km`, and UE power `20–26 dBm` for sensitivity exploration), a cross-frequency comparison table, a 6-metric telemetry strip, **Uplink SNR vs. Distance** plot, **I/Q Constellation** view, **2D Radial Coverage Zone Map**, and PNG/CSV export.
+2. **Research Results:** Summary findings and verified tables from the Python experiments (`adaptive_coverage_summary.csv`, `adaptive_strategy_comparison.csv`, `adaptive_mc_validation.csv`) with CSV downloads.
+3. **Methodology & Limitations:** Core equations (Close-In path loss, link budget, thermal noise, $E_b/N_0$, nominal rate), model parameters, study limitations, references, and team credits.
+4. **Glossary & Equations (127):** Searchable reference of 127 digital communications terms across 10 categories, with category filters and CSV export.
 
 ---
 
-## Penggunaan Offline dan Reproduksi Riset Python
+## Key Concepts Covered
 
-### Prasyarat & Setup Python 3.12 (`uv`)
-```powershell
-uv venv --python 3.12 .venv
-uv pip install --python .venv\Scripts\python.exe -r requirements-dev.txt
+- **Path Loss:** Signal attenuation over distance. Moving from 1800 MHz to 900 MHz reduces free-space/Close-In path loss by **6.02 dB** ($20\log_{10}(2)$), extending usable cell radius.
+- **Signal-to-Noise Ratio (SNR):** The ratio of received signal power to thermal noise power. Higher SNR allows higher data rates and fewer bit errors.
+- **BER Target:** The maximum acceptable Bit Error Rate—set to **$\text{BER} \le 10^{-2}$** in this study—used to decide whether a modulation and bandwidth pair is viable.
+- **Outage:** The probability that a link fails to meet the BER target under random shadowing and fading (evaluated against a **5% outage** reliability threshold).
+- **Adaptive Modulation:** Switching between `BPSK`, `QPSK`, `16-QAM`, and `64-QAM` based on channel quality—using higher-order modulation near the BTS and falling back to `BPSK`/`QPSK` near the cell edge.
+- **Adaptive Bandwidth (`N_RB`):** Narrowing the UE's allocated LTE Resource Blocks from `25 RB` (`4.50 MHz`) down to `1 RB` (`180 kHz`). Because total UE power is fixed, concentrating it into fewer RBs lowers receiver thermal noise and increases SNR by up to **13.98 dB**, trading nominal data rate for range.
+
+---
+
+## Repository Structure
+
+```text
+rural-link/
+├── dashboard_rurallink.html   # Canonical standalone static HTML dashboard (immutable)
+├── public/                    # Static Vercel deployment root
+│   ├── index.html             # Byte-for-byte copy of dashboard_rurallink.html
+│   └── favicon.ico            # RuralLink icon
+├── vercel.json                # Pure static hosting config (outputDirectory: public)
+├── config.py                  # Python simulation parameters and validation
+├── src/                       # Python scientific engine (propagation, link_budget, modulation, channels, metrics, adaptive)
+├── experiments/               # Deterministic experiment scripts (run_experiments.py, run_adaptive.py)
+├── outputs/                   # Verified results: summary.md, results/*.csv, figures/*.png
+├── tests/                     # Automated scientific and environment tests (pytest)
+├── glossary_data.py           # Dataset of 127 glossary terms
+└── docs/                      # Methodology, references, results guide, and team documentation
 ```
 
-### Menjalankan Eksperimen dan Pengujian
+---
+
+## How to Run Locally
+
+### Option 1: Open Directly in a Browser (No Setup)
+Double-click [`public/index.html`](public/index.html) or [`dashboard_rurallink.html`](dashboard_rurallink.html) to open the dashboard offline in any modern browser.
+
+### Option 2: Serve with a Local Static Server
 ```powershell
-# Reproduksi hasil Fase 02-03 (CSV & grafik PNG)
+python -m http.server --directory public 8000
+```
+Then open `http://127.0.0.1:8000/`.
+
+---
+
+## Reproducibility & Research Notes
+
+The repository preserves the full offline **Python 3.12** research engine (`src/`, `experiments/`, `outputs/`) used to generate and validate the published numbers. Note that the HTML dashboard uses real-time analytical JavaScript for instant interactivity, whereas the Python engine runs exact Cho–Yoon BER math and bit-level Monte Carlo simulations (`seed = 42`, `5,000` shared shadowing + Rayleigh CSI realizations, `1,000,000` MC bits, Wilson 95% CI, UE power hard-capped at `23 dBm`).
+
+### Running the Python Experiments & Checks
+```powershell
+# Setup environment (Python 3.12 via uv)
+uv venv --python 3.12 .venv
+uv pip install --python .venv\Scripts\python.exe -r requirements-dev.txt
+
+# Reproduce Phase 02-03 validation (CSVs & PNG figures)
 .venv\Scripts\python.exe -m experiments.run_experiments
 
-# Reproduksi hasil adaptif S0-S3 & R0 Fase 04-06
+# Reproduce Phase 04-06 adaptive strategy experiments (S0-S3 & R0)
 .venv\Scripts\python.exe -m experiments.run_adaptive
 
-# Validasi test ilmiah & linter
+# Run tests and linter
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\python.exe -m ruff check .
 .venv\Scripts\python.exe -m ruff format --check .
 ```
 
-### Struktur Repositori
-```text
-rural-link/
-├── dashboard_rurallink.html   # File HTML kanonik karya Zahran (immutable, siap pakai offline)
-├── public/                    # Root deployment statis Vercel
-│   ├── index.html             # Salinan identik byte-for-byte dari dashboard_rurallink.html
-│   └── favicon.ico            # Favicon resmi dari aset logo RuralLink
-├── vercel.json                # Konfigurasi hosting statis murni (outputDirectory: public)
-├── config.py                  # Parameter default & validasi penelitian Python
-├── src/                       # Mesin simulasi ilmiah Python (propagation, link_budget, modulation, channels, metrics, adaptive)
-├── experiments/               # Skrip reproduksi eksperimen deterministik
-├── outputs/                   # Hasil terverifikasi: summary.md, results/*.csv, figures/*.png
-├── tests/                     # Pengujian otomatis ilmiah & environment (pytest)
-├── glossary_data.py           # Dataset kamus 127 istilah penelitian
-└── docs/                      # Dokumentasi metodologi, referensi, hasil, demo, dan tata kelola tim
-```
+### Verified Numerical Highlights ([`outputs/summary.md`](outputs/summary.md))
+- **RB Narrowing SNR Gain (THEORETICAL):** `25 -> 1 RB` = **`+13.9794 dB`**; `25 -> 5 RB` = **`+6.9897 dB`**; `1 RB` noise floor = **`-117.447 dBm`**.
+- **900 MHz NLOS at 2 km (Shadowing + Rayleigh CSI, SIMULATED):** `S0` outage **`38.9%`** (`5.50 Mbit/s` effective) vs. `S3` outage **`5.7%`** (`11.97 Mbit/s` effective), compared to `R0` (`5.7%` outage, `0.17 Mbit/s` effective).
+- **1800 MHz NLOS at 2 km (Shadowing + Rayleigh CSI, SIMULATED):** `S0` outage **`57.8%`** (`3.79 Mbit/s` effective) vs. `S3` outage **`12.0%`** (`7.79 Mbit/s` effective), compared to `R0` (`12.0%` outage, `0.16 Mbit/s` effective).
+
+### Scope & Limitations
+- Link-level uncoded model (no FEC/HARQ, no inter-cell interference, no multi-user scheduling); nominal rates (`B_active * log2(M)`) are not full LTE network throughput.
+- Close-In path loss parameters (`n`, `sigma`) are extrapolated from 1400 MHz rural measurements in South Korea (Park et al., 2023) without Indonesian 3T field calibration.
+- 2D coverage maps are radial and do not include terrain elevation; radii reaching `12 km` are right-censored (`>=12 km`).
+- `700 MHz` and `>23 dBm` controls in the HTML dashboard are exploratory only; canonical Python experiments evaluate `900/1800 MHz` at `<= 23 dBm`.
 
 ---
 
-## Tim dan Kredit
+## Deployment
 
-**Kelompok 1 — Sistem Komunikasi Digital (2026)**
+Configured for pure static hosting on **Vercel** via [`vercel.json`](vercel.json) (`outputDirectory: "public"`). No build step, Python runtime, or environment variables are required.
 
-| Anggota | Tanggung Jawab |
+---
+
+## Team & Credits
+
+**Group 1 — Digital Communication Systems (2026)**  
+Lecturer: **Bu Dessy** · S1 Electrical Engineering, FMIPA, Universitas Padjadjaran
+
+| Member | Role |
 |---|---|
-| **Yusril** | Presentasi / PPT |
-| **Rizqul** | Presentasi / PPT |
-| **Baihaqy** | Analisis dan diskusi |
-| **Jeyd** | Analisis dan diskusi |
-| **Aditya** | Program dan simulasi |
-| **Zahran** | Program dan simulasi (termasuk aplikasi HTML statis kanonik `dashboard_rurallink.html`) |
+| **Yusril** | Presentation / PPT |
+| **Rizqul** | Presentation / PPT |
+| **Baihaqy** | Analysis and discussion |
+| **Jeyd** | Analysis and discussion |
+| **Aditya** | Programming and simulation |
+| **Zahran** | Programming and simulation (including canonical static HTML app `dashboard_rurallink.html`) |
 
----
-
-## Referensi dan Batasan
-
-- **Reddy et al. (2022)** — *Uplink coverage enhancements for extremely large-cell sites*, *EURASIP J. Wireless Commun. Netw.*, DOI: `10.1186/s13638-022-02133-3`.
-- **Khan et al. (2025)** — *Optimizing adaptive modulation technique using standard propagation model for enhanced wireless communication channels*, *Scientific Reports*, DOI: `10.1038/s41598-025-16743-6` (digunakan untuk kerangka BER target $10^{-2}$; persamaan Gray-coded BER mengikuti Cho & Yoon 2002).
-- **Park et al. (2023)** — *Measurement-based Close-in Path Loss Modeling with Diffraction for Rural Long-distance Communications*, *IEEE Wireless Commun. Lett.* / `arXiv:2305.01152v1`.
-- **Cho & Yoon (2002)** — *On the general BER expression of one- and two-dimensional amplitude modulations*, *IEEE Trans. Commun.*, DOI: `10.1109/TCOMM.2002.1006557`.
-- **Yogapratama et al. (2015)** — Parameter link budget LTE pedesaan 900/1800 MHz (Tabel IV; catatan verifikasi di [docs/REFERENCES.md](docs/REFERENCES.md)).
-- **Kementerian Komdigi RI (2025)** — *Laporan Kinerja 2025* (cakupan 4G Q2 2025 dan BTS 3T).
-
-**Sumber daya terkait:** [Metodologi Matematis](docs/METHODOLOGY.md) · [Referensi Lengkap](docs/REFERENCES.md) · [Ringkasan Hasil](outputs/summary.md) · [Panduan Hasil](docs/RESULTS_GUIDE.md) · [Panduan Demo](docs/DEMO_GUIDE.md) · [Sitasi](CITATION.cff)
+**Key References:** Reddy et al. (2022) · Khan et al. (2025) · Park et al. (2023) · Cho & Yoon (2002) · Yogapratama et al. (2015) · Kementerian Komdigi RI (2025). Full citations and methodology notes are in [`docs/REFERENCES.md`](docs/REFERENCES.md) and [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md).
