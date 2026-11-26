@@ -355,19 +355,30 @@
     if (lastOpData) renderFreqComparisonTable(lastOpData, lastZonesData);
   }
 
+  const STRAT_SHORT = {
+    S0: "Fixed QPSK 25 RB",
+    S1: "Adaptif Mod",
+    S2: "Adaptif BW",
+    S3: "Joint Adaptif",
+    R0: "Fixed BPSK 1 RB",
+  };
+
   function renderStrategyTable(stochData) {
     const tbody = document.querySelector("#tblStrategyCmp tbody");
     tbody.innerHTML = stochData.strategy_comparison
       .map((r) => {
         const condTxt =
           r.fading_cond_ber_mean === null ? "n/a" : r.fading_cond_ber_mean.toExponential(1);
-        return `<tr>
-          <td><strong>${r.scenario}</strong>: ${r.label}</td>
-          <td>${r.median_config}</td>
-          <td>${fmtIdNum(r.median_rate_mbps, 2)} Mbit/s</td>
+        const activeCls = r.scenario === state.strategy ? ' class="active-row"' : "";
+        const shortLabel = STRAT_SHORT[r.scenario] || r.label;
+        const cfgTxt = r.median_config.replace(" x ", " × ");
+        return `<tr${activeCls}>
+          <td><strong>${r.scenario}</strong> · ${shortLabel}</td>
+          <td>${cfgTxt}</td>
+          <td>${fmtIdNum(r.median_rate_mbps, 2)}</td>
           <td>${fmtIdNum(r.shadow_outage_pct, 1)}%</td>
           <td>${fmtIdNum(r.fading_outage_pct, 1)}%</td>
-          <td>${fmtIdNum(r.fading_effective_rate_mbps, 2)} Mbit/s</td>
+          <td>${fmtIdNum(r.fading_effective_rate_mbps, 2)}</td>
           <td>${condTxt}</td>
         </tr>`;
       })
@@ -385,9 +396,10 @@
         const s3 = item.s3;
         const rad = radMap.get(item.freq_mhz);
         const s3Cfg = s3.ok ? `${s3.mod} × ${s3.rb} RB` : "Outage";
-        const s3Rate = s3.ok ? `${fmtIdNum(s3.rate_mbps, 2)} Mbit/s` : "outage";
-        return `<tr>
-          <td><strong>${item.freq_mhz} MHz</strong></td>
+        const s3Rate = s3.ok ? fmtIdNum(s3.rate_mbps, 2) : "outage";
+        const activeCls = item.freq_mhz === state.freq_mhz ? ' class="active-row"' : "";
+        return `<tr${activeCls}>
+          <td><strong>${item.freq_mhz}</strong></td>
           <td>${fmtIdNum(item.pl_db, 1)}</td>
           <td>${fmtIdNum(item.snr_25rb_db, 1)}</td>
           <td>${fmtIdNum(item.snr_1rb_db, 1)}</td>

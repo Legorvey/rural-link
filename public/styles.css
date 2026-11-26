@@ -650,6 +650,18 @@ canvas {
   background: var(--surface-alt);
 }
 
+.compact-table th,
+.compact-table td {
+  padding: 6px 7px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.compact-table tr.active-row td {
+  background: #F1F5F9;
+  font-weight: 600;
+}
+
 .dot {
   display: inline-block;
   width: 9px;
