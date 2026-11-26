@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
+from glossary_data import CATEGORIES, ENTRIES, glossary_csv_bytes
 from src.adaptive import evaluate_scenario_curves, summarize_coverage
 
 APP = Path(__file__).resolve().parents[1] / "app.py"
@@ -44,7 +45,7 @@ def test_default_render_single_page_workbench_and_tabs():
         "Perbandingan frekuensi",
     ):
         assert label in text
-    assert len(at.tabs) == 3
+    assert len(at.tabs) == 4
     assert len(at.get("plotly_chart")) == 4
     assert len(at.dataframe) >= 4
     assert not at.error
@@ -187,3 +188,43 @@ def test_live_results_match_published_csv():
     pub = pub[(pub.freq_mhz == 900.0) & (pub.environment == "NLOS")].set_index("scenario")
     for col in ("radius_median_km", "radius_stochastic_km", "radius_fading_km"):
         assert (live[col] == pub.loc[live.index, col]).all()
+
+
+def test_glossary_tab_renders_required_terms_and_csv():
+    at = _app()
+    assert "Ensiklopedia RuralLink" in _md(at)
+    assert len(at.table) == len(CATEGORIES) == 10
+    terms = {e.istilah for e in ENTRIES}
+    for req in (
+        "3T",
+        "CI / Close-In",
+        "Es/N0 / Eb/N0",
+        "AWGN / Gaussian noise",
+        "BPSK / QPSK / 16-QAM / 64-QAM",
+        "BER",
+        "S0 / S1 / S2 / S3 / R0",
+        "Rule of three / Zero observed errors",
+        "Reddy 2022",
+        "Streamlit",
+    ):
+        assert req in terms
+    assert all(e.istilah and e.kepanjangan and e.penjelasan and e.persamaan for e in ENTRIES)
+    assert any(e.persamaan == "-" for e in ENTRIES)
+    csv_text = glossary_csv_bytes().decode("utf-8-sig")
+    assert "Kategori,Istilah / Singkatan" in csv_text
+    assert len(at.get("download_button")) >= 1
+
+
+def test_glossary_search_and_category_filter():
+    at = _app()
+    at.selectbox(key="gloss_cat").set_value("H. Simulasi & Statistik")
+    _run(at)
+    assert len(at.table) == 1
+    assert (
+        "Rule of three / Zero observed errors" in at.table[0].value["Istilah / Singkatan"].tolist()
+    )
+
+    at.text_input(key="gloss_q").set_value("Wilson")
+    _run(at)
+    assert len(at.table) == 1
+    assert len(at.table[0].value) == 1

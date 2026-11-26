@@ -1476,7 +1476,8 @@ def render_glossary_markdown() -> str:
     lines = [
         "# Kamus Istilah Teknis & Persamaan (Ensiklopedia RuralLink)",
         "",
-        f"Total entri: **{len(ENTRIES)}** istilah dalam **{len(CATEGORIES)}** kategori. "(
+        (
+            f"Total entri: **{len(ENTRIES)}** istilah dalam **{len(CATEGORIES)}** kategori. "
             "Dokumen ini dihasilkan langsung dari `glossary_data.py` agar selalu konsisten dengan "
             "Tab D di aplikasi Streamlit."
         ),
