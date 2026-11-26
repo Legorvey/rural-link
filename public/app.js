@@ -2,11 +2,11 @@
   "use strict";
 
   const MOD_COLOR = {
-    "64-QAM": "#0F2A47",
-    "16-QAM": "#0F766E",
-    "QPSK": "#7FA6C9",
-    "BPSK": "#B45309",
-    "Outage": "#D5DBE3",
+    "64-QAM": "#1E3A8A",
+    "16-QAM": "#0D9488",
+    "QPSK": "#3B82F6",
+    "BPSK": "#D97706",
+    "Outage": "#E2E8F0",
   };
   const FREQ_COLORS = {
     700: "#1D4ED8",
@@ -46,6 +46,7 @@
     mod_manual: "QPSK",
     n_bits: 100000,
     zone_strategy: "S3",
+    show_reliability: false,
     mc_view: "opt_vs_s0",
     live_mc: true,
   };
@@ -671,81 +672,110 @@
   }
 
   function drawCoverageMap(zoneData) {
-    const { ctx, W, H } = setupCanvas("cvMap", 1180, 305);
+    const { ctx, W, H } = setupCanvas("cvMap", 1180, 295);
     if (!zoneData || !zoneData.zones) return;
 
     const centers = [W * 0.17, W * 0.5, W * 0.83];
     const R_px = 104;
     const rMaxKm = 12.0;
-    const cy = H / 2 + 4;
+    const cy = H / 2 + 2;
 
     zoneData.zones.forEach((zone, idx) => {
       const cx = centers[idx];
+      const isSelectedFreq = zone.freq_mhz === state.freq_mhz;
 
+      // Clean base cell disk (12 km)
+      ctx.fillStyle = MOD_COLOR.Outage;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Seamless filled modulation zones (no harsh white ring strokes)
       const sortedRings = [...zone.rings].sort((a, b) => b.outer_km - a.outer_km);
       sortedRings.forEach((ring) => {
+        if (ring.modulation === "Outage") return;
         const rPx = (ring.outer_km / rMaxKm) * R_px;
         ctx.fillStyle = MOD_COLOR[ring.modulation] || MOD_COLOR.Outage;
         ctx.beginPath();
         ctx.arc(cx, cy, rPx, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.strokeStyle = "#FFFFFF";
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
       });
 
-      ctx.strokeStyle = "#0F172A";
-      ctx.lineWidth = 1.3;
+      // Simple clean outer boundary
+      ctx.strokeStyle = isSelectedFreq ? "#0F2A47" : "#334155";
+      ctx.lineWidth = isSelectedFreq ? 1.8 : 1.3;
       ctx.beginPath();
       ctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
       ctx.stroke();
 
-      if (zone.radius_stochastic_km > 0) {
-        ctx.save();
-        ctx.setLineDash([6, 4]);
-        ctx.strokeStyle = "#0F2A47";
-        ctx.lineWidth = 2.2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, (zone.radius_stochastic_km / rMaxKm) * R_px, 0, 2 * Math.PI);
-        ctx.stroke();
-        ctx.restore();
-      }
-      if (zone.radius_fading_km > 0) {
-        ctx.save();
-        ctx.setLineDash([2, 3]);
-        ctx.strokeStyle = "#B45309";
-        ctx.lineWidth = 2.4;
-        ctx.beginPath();
-        ctx.arc(cx, cy, (zone.radius_fading_km / rMaxKm) * R_px, 0, 2 * Math.PI);
-        ctx.stroke();
-        ctx.restore();
+      // Optional 95% reliability rings (OFF by default)
+      if (state.show_reliability) {
+        if (zone.radius_stochastic_km > 0) {
+          ctx.save();
+          ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = "rgba(15, 42, 71, 0.78)";
+          ctx.lineWidth = 1.7;
+          ctx.beginPath();
+          ctx.arc(cx, cy, (zone.radius_stochastic_km / rMaxKm) * R_px, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.restore();
+        }
+        if (zone.radius_fading_km > 0) {
+          ctx.save();
+          ctx.setLineDash([2, 3]);
+          ctx.strokeStyle = "rgba(180, 83, 9, 0.9)";
+          ctx.lineWidth = 1.9;
+          ctx.beginPath();
+          ctx.arc(cx, cy, (zone.radius_fading_km / rMaxKm) * R_px, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
 
-      ctx.fillStyle = "#0F172A";
-      ctx.beginPath();
-      ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
-      ctx.fill();
-
+      // Subtle BTS-to-UE radial guide + BTS center + UE marker
       const uePx = cx + (state.dist_km / rMaxKm) * R_px;
+      ctx.strokeStyle = "rgba(15, 23, 42, 0.28)";
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(uePx, cy);
+      ctx.stroke();
+
+      // BTS center marker
       ctx.fillStyle = "#FFFFFF";
       ctx.strokeStyle = "#0F172A";
       ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4.4, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+
+      // UE position marker (matches draggable yellow SNR operating point)
+      ctx.fillStyle = "#F59E0B";
+      ctx.strokeStyle = "#0F172A";
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.arc(uePx, cy, 4.8, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#0F2A47";
+      // Clean mini-map title & radius summary
+      ctx.fillStyle = isSelectedFreq ? "#0F2A47" : "#334155";
       ctx.font = "bold 12.5px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(`${zone.freq_mhz} MHz | ${state.env}, ${zone.scenario}`, cx, 20);
+      const freqTag = isSelectedFreq
+        ? " · Aktif"
+        : zone.freq_mhz === 700
+          ? " · Suplemen"
+          : "";
+      ctx.fillText(`${zone.freq_mhz} MHz${freqTag}`, cx, 20);
 
-      ctx.fillStyle = "#334155";
+      ctx.fillStyle = "#475569";
       ctx.font = "11px sans-serif";
       ctx.fillText(
         `Median: ${zone.radius_median_label} · Andal 95%: ${zone.radius_fading_label}`,
         cx,
-        H - 12
+        H - 10
       );
     });
   }
@@ -1582,6 +1612,17 @@
   document.getElementById("selZoneStrat").addEventListener("change", (e) => {
     state.zone_strategy = e.target.value;
     refreshAllWorkbench("discrete");
+  });
+
+  document.getElementById("chkShowReliability").addEventListener("change", (e) => {
+    state.show_reliability = Boolean(e.target.checked);
+    const cap = document.getElementById("mapCaption");
+    if (cap) {
+      cap.textContent = state.show_reliability
+        ? "Zona warna: median PL · Garis putus navy: batas 95% shadowing · Garis titik amber: batas 95% (+Rayleigh CSI)."
+        : "Zona warna menunjukkan jangkauan median (THEORETICAL, radius 1–12 km) · Pusat: BTS · Titik kuning: posisi UE.";
+    }
+    if (lastZonesData) drawCoverageMap(lastZonesData);
   });
 
   document.getElementById("rngDist").addEventListener("input", (e) => {

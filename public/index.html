@@ -305,28 +305,32 @@
 
           <article class="panel chart-panel">
             <div class="chart-head">
-              <h2>Peta Zona Modulasi Radial Sisi-ke-Sisi (1–12 km, model hipotetis)</h2>
-              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <label for="selZoneStrat" class="chart-note" style="font-weight:600;">Strategi peta:</label>
-                <select id="selZoneStrat" style="width:auto; min-width:220px;">
-                  <option value="S0">S0: Fixed QPSK, fixed 25 RB</option>
-                  <option value="S1">S1: Adaptive modulation, 25 RB</option>
-                  <option value="S2">S2: Adaptive bandwidth, QPSK</option>
+              <h2>Peta Zona Modulasi Radial (1–12 km)</h2>
+              <div class="map-controls">
+                <label for="selZoneStrat" class="map-ctl-label">Strategi:</label>
+                <select id="selZoneStrat" class="map-select">
+                  <option value="S0">S0: Fixed QPSK, 25 RB</option>
+                  <option value="S1">S1: Adaptive mod, 25 RB</option>
+                  <option value="S2">S2: Adaptive BW, QPSK</option>
                   <option value="S3" selected>S3: Joint adaptive</option>
                   <option value="R0">R0: Fixed BPSK, 1 RB</option>
                 </select>
-                <span class="chart-note">
-                  <span class="dot" style="background:#0F2A47"></span>64-QAM
-                  &nbsp;<span class="dot" style="background:#0F766E"></span>16-QAM
-                  &nbsp;<span class="dot" style="background:#7FA6C9"></span>QPSK
-                  &nbsp;<span class="dot" style="background:#B45309"></span>BPSK
-                  &nbsp;<span class="dot" style="background:#D5DBE3"></span>Outage
+                <label class="map-check" for="chkShowReliability">
+                  <input type="checkbox" id="chkShowReliability" />
+                  <span>Batas 95% andal</span>
+                </label>
+                <span class="chart-note map-legend">
+                  <span class="dot" style="background:#1E3A8A"></span>64-QAM
+                  <span class="dot" style="background:#0D9488"></span>16-QAM
+                  <span class="dot" style="background:#3B82F6"></span>QPSK
+                  <span class="dot" style="background:#D97706"></span>BPSK
+                  <span class="dot" style="background:#E2E8F0; border:1px solid #CBD5E1"></span>Outage
                 </span>
               </div>
             </div>
-            <canvas id="cvMap" width="1180" height="305"></canvas>
-            <p class="control-hint">
-              Cincin berwarna: zona median PL (THEORETICAL). Garis putus navy: batas 95% andal shadowing. Garis titik amber: batas 95% andal (+Rayleigh CSI). Radius 12 km tersensor kanan (≥12 km).
+            <canvas id="cvMap" width="1180" height="295"></canvas>
+            <p class="control-hint" id="mapCaption">
+              Zona warna menunjukkan jangkauan median (THEORETICAL, radius 1–12 km) · Pusat: BTS · Titik kuning: posisi UE.
             </p>
           </article>
 
