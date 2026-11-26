@@ -86,3 +86,11 @@ All reference PDFs in `references/` inspected and recorded in `docs/REFERENCES.m
   - Created `CONTRIBUTING.md`, `CITATION.cff`, and `docs/assets/rurallink-mark.svg`; updated `AGENTS.md`.
 - **Current Scientific Status:** Phase 01–03 complete and independently audited (77/77 tests passing, 0 ruff errors). Phase 04 (`src/adaptive.py` and S0–S3 comparative experiments), Phase 05 (full Streamlit dashboard), Phase 06 (final audit), and Phase 07 (deployment) remain **pending** authorization.
 - **Documentation Limitations:** Phase 04–07 sections are explicitly marked pending; PPT and analysis team member pairings remain pending confirmation.
+
+---
+
+## Phase 04-05: COMPLETE (2026-11-26, branch feature/scientific-app)
+- **Phase 04:** `src/adaptive.py` (joint optimizer, S0-S3, shadowing reliability, bit-level validation), `experiments/run_adaptive.py`, `tests/test_adaptive.py`. Outputs: `outputs/results/adaptive_coverage_curves.csv`, `adaptive_coverage_summary.csv`, `adaptive_mc_validation.csv`; `outputs/figures/adaptive_coverage_radius.png`, `adaptive_rate_vs_distance.png`.
+- **Phase 05:** `app.py` Streamlit workbench (left rail, telemetry strip, coverage zones, operating points, bit-level MC with engine constellation samples, method tab); `tests/test_app.py` AppTest smoke tests; light theme in `.streamlit/config.toml`.
+- **Checks:** pytest 91 passed, ruff check and format clean.
+- **Pending:** Phase 06 final audit and Phase 07 deployment (not started, no merge).
