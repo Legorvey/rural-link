@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
+from glossary_data import CATEGORIES, ENTRIES, glossary_csv_bytes
 from src.adaptive import evaluate_scenario_curves, summarize_coverage
 
 APP = Path(__file__).resolve().parents[1] / "app.py"
@@ -26,7 +27,7 @@ def _md(at: AppTest) -> str:
     return " ".join(m.value for m in at.markdown)
 
 
-def test_default_render_header_tabs_and_strip():
+def test_default_render_single_page_workbench_and_tabs():
     at = _app()
     text = _md(at)
     assert "Kelompok 1" in text and "2026" in text
@@ -39,10 +40,30 @@ def test_default_render_header_tabs_and_strip():
         "Konfigurasi aktif",
         "Laju nominal",
         "Probabilitas outage",
+        "Peta zona modulasi radial sisi-ke-sisi",
+        "Fixed vs adaptif",
+        "Perbandingan frekuensi",
     ):
         assert label in text
     assert len(at.tabs) == 4
+    assert len(at.get("plotly_chart")) == 4
+    assert len(at.dataframe) >= 4
     assert not at.error
+    assert list(at.sidebar.segmented_control(key="freq").options) == ["700", "900", "1800"]
+    assert list(at.sidebar.segmented_control(key="ber_target").options) == [
+        "10⁻² (Primer)",
+        "10⁻³ (Eksploratori)",
+    ]
+    assert list(at.sidebar.select_slider(key="nbits").options) == [
+        "10²",
+        "10³",
+        "10⁴",
+        "10⁵",
+        "10⁶",
+    ]
+    assert at.session_state["freq"] == 900.0
+    assert at.session_state["ber_target"] == 1e-2
+    assert at.session_state["nbits"] == 100_000
 
 
 def test_power_slider_capped_and_dist_range():
@@ -61,6 +82,8 @@ def test_frequency_change_updates_telemetry_and_preset_resets():
     _run(at)
     assert at.session_state["freq"] == 900.0 and at.session_state["dist"] == 5.0
     assert at.session_state["strat"] == "S3"
+    assert at.session_state["ber_target"] == 1e-2
+    assert at.session_state["nbits"] == 100_000
 
 
 def test_adaptive_disables_manual_controls_manual_enables_them():
@@ -91,18 +114,69 @@ def test_baseline_outage_state_blocks_monte_carlo():
     assert at.button(key="run_mc").disabled
 
 
-def test_run_simulation_uses_engine_monte_carlo_and_both_strategies():
+def test_run_simulation_uses_engine_monte_carlo_and_both_views():
     at = _app()
     at.button(key="run_mc").click()
     _run(at)
-    text = _md(at)
+    text = " ".join(c.value for c in at.caption)
     assert "BER MC AWGN" in text and "Baseline S0" in text
     mc = at.session_state["mc"]
     assert mc["opt"]["samples_awgn"].size > 0 and mc["opt"]["mc_errors_awgn"] >= 0
     assert mc["base"] is None  # preset 900 MHz NLOS 5 km: S0 baseline in outage
+    assert 700.0 in mc["by_freq"] and 900.0 in mc["by_freq"] and 1800.0 in mc["by_freq"]
+    n_charts_with_mc = len(at.get("plotly_chart"))
+    assert n_charts_with_mc == 5
+
+    at.segmented_control(key="mc_view").set_value("Antar Frekuensi")
+    _run(at)
+    assert len(at.get("plotly_chart")) == n_charts_with_mc
+
     at.sidebar.slider(key="dist").set_value(2.0)
     _run(at)
     assert any("Parameter berubah" in w.value for w in at.warning)
+    assert len(at.get("plotly_chart")) == 4
+    assert "BER MC AWGN" not in " ".join(c.value for c in at.caption)
+
+
+def test_direct_sidebar_700mhz_and_ber_1e3():
+    at = _app()
+    at.sidebar.segmented_control(key="freq").set_value(700.0)
+    at.sidebar.segmented_control(key="ber_target").set_value(1e-3)
+    _run(at)
+    captions = " ".join(c.value for c in at.caption)
+    assert "Catatan suplemen:" in captions
+    assert "900/1800 MHz pada BER 1e-2" in captions
+    assert at.session_state["freq"] == 700.0
+    assert not at.error
+
+
+def test_mc_logarithmic_bits_alignment_small_sample_warning_and_zero_error_ci():
+    at = _app()
+    at.sidebar.select_slider(key="nbits").set_value(100)
+    at.sidebar.selectbox(key="strat").set_value("MANUAL")
+    at.sidebar.slider(key="dist").set_value(1.0)
+    _run(at)
+    at.sidebar.segmented_control(key="mod").set_value("64-QAM")
+    at.sidebar.segmented_control(key="rb").set_value(1)
+    _run(at)
+    assert any("Sampel kecil" in w.value for w in at.warning)
+    at.button(key="run_mc").click()
+    _run(at)
+    mc = at.session_state["mc"]
+    assert mc["opt"]["n_bits"] == 102
+    assert mc["opt"]["samples_awgn"].size == 17
+    captions = " ".join(c.value for c in at.caption)
+    assert "102 bit / 17 simbol, sampel konstelasi 17" in captions
+    if mc["opt"]["mc_errors_awgn"] == 0:
+        assert "rule-of-three" in captions
+
+
+def test_zone_strategy_sync_and_independent_override():
+    at = _app()
+    assert at.session_state["zone_sc"] == "S3"
+    at.selectbox(key="zone_sc").set_value("S0")
+    _run(at)
+    assert at.session_state["zone_sc"] == "S0"
 
 
 def test_live_results_match_published_csv():
@@ -114,3 +188,43 @@ def test_live_results_match_published_csv():
     pub = pub[(pub.freq_mhz == 900.0) & (pub.environment == "NLOS")].set_index("scenario")
     for col in ("radius_median_km", "radius_stochastic_km", "radius_fading_km"):
         assert (live[col] == pub.loc[live.index, col]).all()
+
+
+def test_glossary_tab_renders_required_terms_and_csv():
+    at = _app()
+    assert "Ensiklopedia RuralLink" in _md(at)
+    assert len(at.table) == len(CATEGORIES) == 10
+    terms = {e.istilah for e in ENTRIES}
+    for req in (
+        "3T",
+        "CI / Close-In",
+        "Es/N0 / Eb/N0",
+        "AWGN / Gaussian noise",
+        "BPSK / QPSK / 16-QAM / 64-QAM",
+        "BER",
+        "S0 / S1 / S2 / S3 / R0",
+        "Rule of three / Zero observed errors",
+        "Reddy 2022",
+        "Streamlit",
+    ):
+        assert req in terms
+    assert all(e.istilah and e.kepanjangan and e.penjelasan and e.persamaan for e in ENTRIES)
+    assert any(e.persamaan == "-" for e in ENTRIES)
+    csv_text = glossary_csv_bytes().decode("utf-8-sig")
+    assert "Kategori,Istilah / Singkatan" in csv_text
+    assert len(at.get("download_button")) >= 1
+
+
+def test_glossary_search_and_category_filter():
+    at = _app()
+    at.selectbox(key="gloss_cat").set_value("H. Simulasi & Statistik")
+    _run(at)
+    assert len(at.table) == 1
+    assert (
+        "Rule of three / Zero observed errors" in at.table[0].value["Istilah / Singkatan"].tolist()
+    )
+
+    at.text_input(key="gloss_q").set_value("Wilson")
+    _run(at)
+    assert len(at.table) == 1
+    assert len(at.table[0].value) == 1

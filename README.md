@@ -90,13 +90,12 @@ Seluruh angka di bawah berasal langsung dari [outputs/summary.md](outputs/summar
 
 Buka [https://rural-link.streamlit.app/](https://rural-link.streamlit.app/) di browser:
 
-1. Klik **Preset: pemulihan tepi sel** di panel kiri (`900 MHz`, `NLOS`, `5,0 km`, `23 dBm`, strategi `S3`).
-2. Bandingkan frekuensi **900** dan **1800** MHz pada kontrol *segmented* dan amati perubahan SNR, konfigurasi aktif, serta *outage* di *telemetry strip*.
-3. Ubah lingkungan (`LOS` / `NLOS`) dan geser jarak (`1–12 km`).
-4. Bandingkan strategi adaptif (`S1`–`S3`) dengan baseline tetap (`S0`) pada tabel perbandingan, atau pilih `MANUAL` untuk mengunci `N_RB` dan modulasi sendiri.
-5. Klik **Jalankan simulasi Monte Carlo** pada tab **A. Simulator langsung** untuk menjalankan transmisi bit acak aktual dan melihat konstelasi I/Q AWGN maupun Rayleigh.
-6. Buka tab **B. Visualisasi cakupan** untuk melihat cincin zona modulasi 900 vs 1800 MHz (model radial hipotetis, bukan peta lapangan).
-7. Buka tab **C. Hasil penelitian** untuk melihat grafik publikasi dan mengunduh file `.csv` maupun `.png`.
+1. Klik **Preset: pemulihan tepi sel** di panel kiri (`900 MHz`, `NLOS`, `5,0 km`, `23 dBm`, strategi `S3`, target BER `1e-2`).
+2. Amati seluruh instrumen utama dalam satu halaman **A. Workbench interaktif**: *telemetry strip*, grafik **SNR vs jarak** dengan penanda jarak aktif, **peta zona modulasi radial sisi-ke-sisi**, tabel **Fixed vs adaptif**, dan tabel **Perbandingan frekuensi**.
+3. Bandingkan frekuensi **900** dan **1800** MHz pada kontrol *segmented*, ubah lingkungan (`LOS` / `NLOS`), dan geser jarak (`1–12 km`).
+4. Klik **Jalankan Monte Carlo** untuk menjalankan transmisi bit acak aktual dan membandingkan konstelasi I/Q nyata (**Dioptimalkan vs S0** maupun **Antar Frekuensi**).
+5. (Opsional) Uji target BER `1e-3` atau frekuensi `700 MHz` langsung dari panel kiri (suplemen eksploratori terinspirasi Reddy 2022, bukan replikasi Reddy, dan tidak mengubah `outputs/`).
+6. Buka tab **B. Hasil penelitian (CSV & PNG)** untuk melihat grafik publikasi serta mengunduh file `.csv` maupun `.png`, tab **C. Metodologi & Batasan** untuk persamaan matematis, dan tab **D. Kamus & Persamaan** (**Ensiklopedia RuralLink**) untuk referensi istilah dan persamaan lengkap.
 
 ---
 
