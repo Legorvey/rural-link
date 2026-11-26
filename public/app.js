@@ -6,7 +6,7 @@
     "16-QAM": "#0D9488",
     "QPSK": "#3B82F6",
     "BPSK": "#D97706",
-    "Outage": "#E2E8F0",
+    "Outage": "#CBD5E1",
   };
   const FREQ_COLORS = {
     700: "#1D4ED8",
@@ -46,6 +46,7 @@
     mod_manual: "QPSK",
     n_bits: 100000,
     zone_strategy: "S3",
+    map_mode: "capability",
     show_reliability: false,
     mc_view: "opt_vs_s0",
     live_mc: true,
@@ -135,11 +136,13 @@
     setActiveSegment("data-mod", state.mod_manual);
     setActiveSegment("data-nbits", state.n_bits);
     setActiveSegment("data-mcview", state.mc_view);
+    setActiveSegment("data-mapmode", state.map_mode);
 
     document.getElementById("rngDist").value = String(state.dist_km);
     document.getElementById("rngPt").value = String(state.tx_power_dbm);
     document.getElementById("selStrat").value = state.strategy;
     document.getElementById("selZoneStrat").value = state.zone_strategy;
+    document.getElementById("selZoneStrat").disabled = state.map_mode === "capability";
     document.getElementById("chkLiveMc").checked = Boolean(state.live_mc);
 
     const manual = state.strategy === "MANUAL";
@@ -694,6 +697,28 @@
     });
   }
 
+  function updateMapHeaderText() {
+    const titleEl = document.getElementById("mapTitle");
+    const capEl = document.getElementById("mapCaption");
+    if (titleEl) {
+      titleEl.textContent =
+        state.map_mode === "capability"
+          ? "Peta Cakupan Modulasi Adaptif"
+          : "Hasil Optimasi Modulasi & RB";
+    }
+    if (capEl) {
+      if (state.map_mode === "capability") {
+        capEl.textContent = state.show_reliability
+          ? "Modulasi tertinggi yang layak (1–12 km, N_RB = 1..25) · Putus navy: batas 95% shadowing · Titik amber: batas 95% (+Rayleigh CSI)."
+          : "Modulasi tertinggi yang layak pada tiap jarak (1–12 km, N_RB = 1..25) · Pusat: BTS · Titik kuning: posisi UE.";
+      } else {
+        capEl.textContent = state.show_reliability
+          ? `Hasil optimasi ${state.zone_strategy} (1–12 km) · Putus navy: 95% shadowing · Titik amber: 95% (+Rayleigh CSI) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block.`
+          : `Hasil optimasi ${state.zone_strategy} (1–12 km) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block.`;
+      }
+    }
+  }
+
   function drawCoverageMap(zoneData) {
     const { ctx, W, H } = setupCanvas("cvMap", 1180, 295);
     if (!zoneData || !zoneData.zones) return;
@@ -702,27 +727,47 @@
     const R_px = 104;
     const rMaxKm = 12.0;
     const cy = H / 2 + 2;
+    const isCap = state.map_mode === "capability";
 
     zoneData.zones.forEach((zone, idx) => {
       const cx = centers[idx];
       const isSelectedFreq = zone.freq_mhz === state.freq_mhz;
 
-      // Clean base cell disk (12 km)
-      ctx.fillStyle = MOD_COLOR.Outage;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Seamless filled modulation zones (no harsh white ring strokes)
-      const sortedRings = [...zone.rings].sort((a, b) => b.outer_km - a.outer_km);
-      sortedRings.forEach((ring) => {
-        if (ring.modulation === "Outage") return;
-        const rPx = (ring.outer_km / rMaxKm) * R_px;
-        ctx.fillStyle = MOD_COLOR[ring.modulation] || MOD_COLOR.Outage;
+      if (isCap && zone.capability_radii) {
+        // Zahran's raster/grid Canvas rendering style using Python-computed capability radii
+        const caps = zone.capability_radii;
+        const step = 4;
+        for (let dx = -R_px; dx <= R_px; dx += step) {
+          for (let dy = -R_px; dy <= R_px; dy += step) {
+            const rPx = Math.sqrt(dx * dx + dy * dy);
+            if (rPx > R_px) continue;
+            const dKm = Math.max((rPx / R_px) * rMaxKm, 0.05);
+            let mod = "Outage";
+            if (dKm <= caps["64-QAM"]) mod = "64-QAM";
+            else if (dKm <= caps["16-QAM"]) mod = "16-QAM";
+            else if (dKm <= caps["QPSK"]) mod = "QPSK";
+            else if (dKm <= caps["BPSK"]) mod = "BPSK";
+            ctx.fillStyle = MOD_COLOR[mod];
+            ctx.fillRect(cx + dx - step / 2, cy + dy - step / 2, step, step);
+          }
+        }
+      } else {
+        // Strategy optimizer rings (S0-S3, R0)
+        ctx.fillStyle = MOD_COLOR.Outage;
         ctx.beginPath();
-        ctx.arc(cx, cy, rPx, 0, 2 * Math.PI);
+        ctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
         ctx.fill();
-      });
+
+        const sortedRings = [...zone.rings].sort((a, b) => b.outer_km - a.outer_km);
+        sortedRings.forEach((ring) => {
+          if (ring.modulation === "Outage") return;
+          const rPx = (ring.outer_km / rMaxKm) * R_px;
+          ctx.fillStyle = MOD_COLOR[ring.modulation] || MOD_COLOR.Outage;
+          ctx.beginPath();
+          ctx.arc(cx, cy, rPx, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+      }
 
       // Simple clean outer boundary
       ctx.strokeStyle = isSelectedFreq ? "#0F2A47" : "#334155";
@@ -791,11 +836,17 @@
 
       ctx.fillStyle = "#475569";
       ctx.font = "11px sans-serif";
-      ctx.fillText(
-        `Median: ${zone.radius_median_label} · Andal 95%: ${zone.radius_fading_label}`,
-        cx,
-        H - 10
-      );
+      if (isCap && zone.capability_radii) {
+        const bMax = zone.capability_radii.BPSK;
+        const bTxt = bMax >= 12.0 ? "≥12 km" : `${fmtIdNum(bMax, 1)} km`;
+        ctx.fillText(`Jangkauan maks: ${bTxt} · Andal 95%: ${zone.radius_fading_label}`, cx, H - 10);
+      } else {
+        ctx.fillText(
+          `Median: ${zone.radius_median_label} · Andal 95%: ${zone.radius_fading_label}`,
+          cx,
+          H - 10
+        );
+      }
     });
   }
 
@@ -1633,20 +1684,25 @@
     refreshAllWorkbench("discrete");
   });
 
+  document.querySelectorAll("[data-mapmode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.map_mode = btn.dataset.mapmode;
+      syncControlsFromState();
+      updateMapHeaderText();
+      if (lastZonesData) drawCoverageMap(lastZonesData);
+    });
+  });
+
   document.getElementById("selZoneStrat").addEventListener("change", (e) => {
     state.zone_strategy = e.target.value;
     syncControlsFromState();
+    updateMapHeaderText();
     refreshStochastic();
   });
 
   document.getElementById("chkShowReliability").addEventListener("change", (e) => {
     state.show_reliability = Boolean(e.target.checked);
-    const cap = document.getElementById("mapCaption");
-    if (cap) {
-      cap.textContent = state.show_reliability
-        ? "Zona warna: median PL · Putus navy: batas 95% shadowing · Titik amber: batas 95% (+Rayleigh CSI) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block."
-        : "Zona warna: median PL (1–12 km) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block.";
-    }
+    updateMapHeaderText();
     if (lastZonesData) drawCoverageMap(lastZonesData);
   });
 

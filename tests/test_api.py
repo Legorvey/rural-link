@@ -279,9 +279,28 @@ def test_native_web_ui_cleanup_contract():
     assert 'id="mcPairSummary"' not in html
     assert 'id="chkShowReliability"' in html
     assert 'id="chkLiveMc" checked' in html
-    assert "perubahan jumlah Resource Block" in html
+    assert "Peta Cakupan Modulasi Adaptif" in html
+    assert "Hasil Optimasi Modulasi &amp; RB" in html
     for tab_id in ("panelWorkbench", "panelResults", "panelMethodology", "panelEncyclopedia"):
         assert f'id="{tab_id}"' in html
+
+
+def test_capability_radii_monotonic_and_power_responsive():
+    r23 = client.post(
+        "/api/stochastic-analysis",
+        json={"tx_power_dbm": 23.0, "env": "NLOS", "include_zones": True},
+    ).json()["zones"]
+    r15 = client.post(
+        "/api/stochastic-analysis",
+        json={"tx_power_dbm": 15.0, "env": "NLOS", "include_zones": True},
+    ).json()["zones"]
+
+    for z23, z15 in zip(r23, r15, strict=True):
+        c23 = z23["capability_radii"]
+        c15 = z15["capability_radii"]
+        assert c23["64-QAM"] <= c23["16-QAM"] <= c23["QPSK"] <= c23["BPSK"]
+        assert c15["64-QAM"] <= c15["16-QAM"] <= c15["QPSK"] <= c15["BPSK"]
+        assert c23["64-QAM"] > c15["64-QAM"]
 
 
 @pytest.mark.parametrize("zone_strategy", ["S0", "S1", "S2", "S3", "R0"])

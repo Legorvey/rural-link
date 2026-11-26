@@ -329,6 +329,24 @@ def _build_radial_rings(curves_df: pd.DataFrame, freq_mhz: float, scenario: str)
     return rings
 
 
+def _build_capability_radii(
+    freq_mhz: float, env: str, tx_power_dbm: float, ber_target: float
+) -> dict[str, float]:
+    """Max deterministic median-PL distance (km) per modulation across allowed RBs."""
+    d_grid = np.round(np.arange(0.05, CFG.distance_max_km + 1e-9, 0.05), 3)
+    pl = median_path_loss_db(d_grid * 1000.0, freq_mhz, env)
+    snr_max = compute_link_budget(
+        pl, n_rb=min(CFG.active_rb_choices), tx_power_dbm=tx_power_dbm
+    ).snr_db
+    thr = _thresholds(ber_target)
+    radii: dict[str, float] = {}
+    for mod in ("64-QAM", "16-QAM", "QPSK", "BPSK"):
+        eb = snr_max - 10.0 * math.log10(bits_per_symbol(mod))
+        feas = d_grid[eb >= thr[mod]["ebn0_db"]]
+        radii[mod] = round(float(feas.max()), 3) if feas.size else 0.0
+    return radii
+
+
 def _serialize_strategy_rows(df: pd.DataFrame) -> list[dict]:
     rows = []
     for _, r in df.iterrows():
@@ -506,6 +524,9 @@ def api_stochastic_analysis(req: StochasticRequest) -> dict:
                         "freq_mhz": int(f),
                         "scenario": req.zone_strategy,
                         "rings": _build_radial_rings(curves_df, f, req.zone_strategy),
+                        "capability_radii": _build_capability_radii(
+                            f, req.env, float(req.tx_power_dbm), float(req.ber_target)
+                        ),
                         "radius_median_km": float(srow_z["radius_median_km"]),
                         "radius_median_label": str(srow_z["radius_median_label"]),
                         "radius_stochastic_km": float(srow_z["radius_stochastic_km"]),
