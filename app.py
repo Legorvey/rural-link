@@ -1,17 +1,22 @@
-"""RuralLink: instrumen riset Streamlit di atas mesin Python tervalidasi (src/).
+"""RuralLink: workbench interaktif Streamlit di atas mesin Python tervalidasi (src/).
 
-Design Read (Antislop): instrumen riset telekomunikasi untuk proyeksi kelas, bahasa visual
-workbench teknik terang, dial ENERGY 1 / RHYTHM 2 / MOTION 1.
+Design Read (Antislop): instrumen riset telekomunikasi satu halaman untuk proyeksi kelas,
+bahasa visual workbench teknik terang (terinspirasi prototypes/dashboard_rurallink.html),
+dial ENERGY 1 / RHYTHM 2 / MOTION 1.
 Alasan desain (R-31):
-- Palet: netral terang + navy (judul, data analitis) + teal (aksen tunggal) + amber (hasil simulasi).
-  Warna membawa label asal data: navy/teal = THEORETICAL, amber = SIMULATED.
-- Rail parameter kiri + telemetry strip: dasar dari prototipe Zahran (prototypes/).
+- Palet: latar terang (#F4F6F9), panel putih berbatas (#CBD5E1), navy (#0F2A47) untuk judul
+  dan data analitis (THEORETICAL), teal (#0F766E) sebagai aksen tunggal, amber (#B45309) untuk
+  hasil simulasi (SIMULATED) serta penanda jarak aktif, dan merah gelap (#9A1B1B) untuk outage.
+- Rail parameter kiri + telemetry strip horizontal + seluruh visualisasi utama dalam satu tab
+  agar presenter dapat membandingkan SNR, konstelasi nyata, zona radial, dan tabel strategi
+  tanpa berpindah tab.
 - Font sistem saja: tanpa aset jaringan, aman untuk mode offline.
-Seluruh angka, kurva, dan sampel konstelasi berasal dari src/. Tidak ada kalkulasi ilmiah di sini.
+Seluruh angka, kurva, zona, dan sampel konstelasi berasal dari src/.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +25,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from config import DEFAULT_CONFIG, PROJECT_NAME, RESEARCH_TITLE
+from config import DEFAULT_CONFIG, PROJECT_NAME, RESEARCH_TITLE, SimulationConfig
 from src.adaptive import (
     SCENARIOS,
     evaluate_scenario_curves,
@@ -42,7 +47,16 @@ CFG = DEFAULT_CONFIG
 ROOT = Path(__file__).resolve().parent
 RES = ROOT / "outputs" / "results"
 FIG = ROOT / "outputs" / "figures"
-NAVY, TEAL, AMBER, GREY, INK = "#0F2A47", "#0F766E", "#B45309", "#64748B", "#0F172A"
+
+NAVY, TEAL, AMBER, SLATE, GREY, INK = (
+    "#0F2A47",
+    "#0F766E",
+    "#B45309",
+    "#1D4ED8",
+    "#64748B",
+    "#0F172A",
+)
+FREQ_COLOR = {700.0: SLATE, 900.0: NAVY, 1800.0: TEAL}
 MOD_COLOR = {
     "BPSK": "#B45309",
     "QPSK": "#7FA6C9",
@@ -61,24 +75,29 @@ st.set_page_config(page_title="RuralLink | Kelompok 1", layout="wide")
 st.markdown(
     """
 <style>
-.block-container {padding-top: 4rem; max-width: 1500px;}
+.block-container {padding-top: 3.1rem; padding-bottom: 1.5rem; max-width: 1560px;}
 [data-testid="stMain"] {overflow-y: auto;}
 h1, h2, h3 {color: #0F2A47;}
-.rl-head {border-bottom: 2px solid #0F766E; padding-bottom: .5rem; margin-bottom: .8rem;}
-.rl-head h1 {font-size: 1.7rem; margin: 0; padding: 0;}
-.rl-head p {margin: .15rem 0 0 0; color: #334155; font-size: .9rem;}
-.rl-strip {display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  border: 1px solid #CBD5E1; background: #FFFFFF; margin: .4rem 0 .8rem 0;}
-.rl-cell {padding: .45rem .7rem; border-right: 1px solid #E2E8F0; min-width: 0;}
+.rl-head {border-bottom: 2px solid #0F766E; padding-bottom: .45rem; margin-bottom: .65rem;}
+.rl-head h1 {font-size: 1.55rem; margin: 0; padding: 0; line-height: 1.2;}
+.rl-head p {margin: .15rem 0 0 0; color: #334155; font-size: .86rem;}
+.rl-strip {display: grid; grid-template-columns: repeat(8, minmax(0, 1fr));
+  border: 1px solid #CBD5E1; border-radius: 4px; background: #FFFFFF; margin: .35rem 0 .7rem 0;}
+@media (max-width: 1120px) {.rl-strip {grid-template-columns: repeat(4, minmax(0, 1fr));}}
+@media (max-width: 640px) {.rl-strip {grid-template-columns: repeat(2, minmax(0, 1fr));}}
+.rl-cell {padding: .42rem .58rem; border-right: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; min-width: 0;}
 .rl-cell:last-child {border-right: none;}
-.rl-l {font-size: .72rem; color: #475569; line-height: 1.2;}
-.rl-v {font-size: 1.12rem; font-weight: 600; color: #0F2A47; font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere; line-height: 1.25;}
-.rl-s {font-size: .7rem; color: #475569;}
+.rl-l {font-size: .69rem; color: #475569; line-height: 1.2; font-weight: 600;}
+.rl-v {font-size: 1.04rem; font-weight: 700; color: #0F2A47; font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere; line-height: 1.25; margin-top: 1px;}
+.rl-s {font-size: .68rem; color: #475569; line-height: 1.2;}
 .rl-sim .rl-v {color: #B45309;}
 .rl-bad .rl-v {color: #9A1B1B;}
-.rl-note {border-left: 3px solid #0F766E; padding: .3rem .7rem; background: #FFFFFF;
-  font-size: .85rem; color: #1E293B; margin: .3rem 0 .6rem 0;}
+.rl-note {border-left: 3px solid #0F766E; padding: .35rem .7rem; background: #FFFFFF;
+  border-top: 1px solid #E2E8F0; border-right: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0;
+  font-size: .83rem; color: #1E293B; margin: .25rem 0 .55rem 0;}
+.rl-note-exp {border-left-color: #B45309;}
+.rl-sec {font-size: .95rem; font-weight: 700; color: #0F2A47; margin: .35rem 0 .25rem 0;}
 button, [role="tab"], [role="radio"], label, summary {cursor: pointer;}
 button:disabled, [disabled] {cursor: not-allowed;}
 button:focus-visible, [role="tab"]:focus-visible, input:focus-visible, summary:focus-visible {
@@ -92,22 +111,40 @@ button:focus-visible, [role="tab"]:focus-visible, input:focus-visible, summary:f
 
 # ------------------------------------------------------------------ engine wrappers
 @st.cache_data
-def thresholds() -> dict:
-    return derive_switching_thresholds(CFG.ber_target, CFG.modulations)
+def make_config(ber_target: float) -> SimulationConfig:
+    return (
+        DEFAULT_CONFIG
+        if np.isclose(ber_target, CFG.ber_target)
+        else replace(CFG, ber_target=float(ber_target))
+    )
+
+
+@st.cache_data
+def thresholds(ber_target: float) -> dict[str, dict[str, float]]:
+    return derive_switching_thresholds(float(ber_target), CFG.modulations)
 
 
 @st.cache_data(show_spinner="Menjalankan mesin Python: path loss, link budget, realisasi bersama")
-def cached_curves(env: str, tx_dbm: float) -> tuple[pd.DataFrame, pd.DataFrame]:
-    curves = pd.concat(
-        [
-            evaluate_scenario_curves(
-                f, env, DISTANCES_KM, tuple(SCENARIOS), tx_dbm, N_DRAWS, CFG.default_seed, CFG
-            )
-            for f in CFG.carrier_frequencies_mhz
-        ],
-        ignore_index=True,
+def cached_freq_curves(
+    freq_mhz: float, env: str, tx_dbm: float, ber_target: float
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Cache per-frekuensi dengan seed identik agar penambahan 700 MHz tidak menghitung ulang 900/1800."""
+    cfg = make_config(ber_target)
+    curves = evaluate_scenario_curves(
+        float(freq_mhz), env, DISTANCES_KM, tuple(SCENARIOS), tx_dbm, N_DRAWS, cfg.default_seed, cfg
     )
-    return curves, summarize_coverage(curves, CFG)
+    return curves, summarize_coverage(curves, cfg)
+
+
+def load_active_curves(
+    freqs: tuple[float, ...], env: str, tx_dbm: float, ber_target: float
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    parts_c, parts_s = [], []
+    for f in freqs:
+        c, s = cached_freq_curves(float(f), env, tx_dbm, ber_target)
+        parts_c.append(c)
+        parts_s.append(s)
+    return pd.concat(parts_c, ignore_index=True), pd.concat(parts_s, ignore_index=True)
 
 
 @st.cache_data(show_spinner="Monte Carlo bit-level sedang berjalan")
@@ -120,27 +157,40 @@ def read_csv(name: str) -> pd.DataFrame | None:
     return pd.read_csv(p) if p.exists() else None
 
 
-def evaluate_link(freq, env, dist, ptx, shadow, strat, rb_manual, mod_manual) -> dict:
+def freq_tag(freq_mhz: float) -> str:
+    return f"{freq_mhz:.0f} MHz (eksploratori)" if freq_mhz == 700.0 else f"{freq_mhz:.0f} MHz"
+
+
+def evaluate_link(
+    freq: float,
+    env: str,
+    dist: float,
+    ptx: float,
+    shadow: str,
+    strat: str,
+    rb_manual: int,
+    mod_manual: str,
+    ber_target: float,
+) -> dict:
     """Satu titik link dari mesin: path loss, link budget, pilihan konfigurasi, BER analitis."""
-    thr = thresholds()
+    cfg = make_config(ber_target)
+    thr = thresholds(ber_target)
     _, sigma = get_ci_parameters(env)
     margin = (
-        analytical_shadow_margin_db(sigma, 1.0 - CFG.outage_target) if shadow == "margin95" else 0.0
+        analytical_shadow_margin_db(sigma, 1.0 - cfg.outage_target) if shadow == "margin95" else 0.0
     )
     pl = float(median_path_loss_db(dist * 1000.0, freq, env)) + margin
     if strat == "MANUAL":
         mod, rb = mod_manual, int(rb_manual)
-        ok_option = True
     else:
-        sel = select_operating_point(pl, strat, ptx, CFG, thr)
+        sel = select_operating_point(pl, strat, ptx, cfg, thr)
         idx = int(sel.index[0])
-        ok_option = idx >= 0
-        if ok_option:
+        if idx >= 0:
             mod, rb = sel.options[idx]
         else:
             mod, rb = "Outage", min(r for _, r in sel.options)
     lb = compute_link_budget(pl, n_rb=rb, tx_power_dbm=ptx)
-    out = {
+    out: dict = {
         "pl": pl,
         "margin": margin,
         "pr": float(lb.pr_dbm),
@@ -148,7 +198,7 @@ def evaluate_link(freq, env, dist, ptx, shadow, strat, rb_manual, mod_manual) ->
         "snr": float(lb.snr_db),
         "rb": rb,
         "mod": mod,
-        "b_hz": active_bandwidth_hz(rb, CFG.rb_bandwidth_hz),
+        "b_hz": active_bandwidth_hz(rb, cfg.rb_bandwidth_hz),
         "p_rb": float(lb.power_per_rb_dbm),
     }
     if mod == "Outage":
@@ -174,7 +224,7 @@ def fmt_rate(bps: float) -> str:
 
 
 def strip(cells: list[tuple[str, str, str, str]]) -> None:
-    """Telemetry strip. Setiap sel: (label, nilai, sub, kelas)."""
+    """Telemetry strip horizontal. Setiap sel: (label, nilai, sub, kelas)."""
     html = "".join(
         f'<div class="rl-cell {c}"><div class="rl-l">{a}</div><div class="rl-v">{b}</div>'
         f'<div class="rl-s">{s}</div></div>'
@@ -184,11 +234,13 @@ def strip(cells: list[tuple[str, str, str, str]]) -> None:
 
 
 def seg(label: str, options, key: str, disabled: bool = False, fmt=str):
-    st.session_state.setdefault(key, options[0] if key not in DEFAULTS else DEFAULTS[key])
+    if key not in st.session_state or st.session_state[key] not in options:
+        fallback = DEFAULTS.get(key)
+        st.session_state[key] = fallback if fallback in options else options[0]
     val = st.segmented_control(
         label, options, key=key, format_func=fmt, selection_mode="single", disabled=disabled
     )
-    return val if val is not None else (DEFAULTS.get(key) or options[0])
+    return val if val is not None else st.session_state[key]
 
 
 DEFAULTS = {
@@ -202,6 +254,10 @@ DEFAULTS = {
     "mod": "QPSK",
     "shadow": "median",
     "nbits": 100_000,
+    "ber_target": 1e-2,
+    "inc_700": False,
+    "zone_sc": "S3",
+    "mc_view": "Dioptimalkan vs S0",
 }
 for _k, _v in DEFAULTS.items():
     st.session_state.setdefault(_k, _v)
@@ -214,9 +270,14 @@ def apply_preset() -> None:
     st.session_state.pop("mc", None)
 
 
+def sync_zone_strategy() -> None:
+    if st.session_state.get("strat") in SCENARIOS:
+        st.session_state["zone_sc"] = st.session_state["strat"]
+
+
 # ------------------------------------------------------------------ header
 st.markdown(
-    f"""<div class="rl-head"><h1>{PROJECT_NAME}: Simulator Jangkauan Uplink Adaptif</h1>
+    f"""<div class="rl-head"><h1>{PROJECT_NAME}: Workbench Jangkauan Uplink Adaptif</h1>
 <p>{RESEARCH_TITLE}</p>
 <p><b>Kelompok 1</b> | Sistem Komunikasi Digital | 2026 | {TEAM}</p></div>""",
     unsafe_allow_html=True,
@@ -230,13 +291,15 @@ with st.sidebar:
         on_click=apply_preset,
         key="preset_btn",
         width="stretch",
-        help="900 MHz NLOS, 5 km, 23 dBm, S3. Baseline S0 mengalami outage di jarak ini.",
+        help="900 MHz NLOS, 5 km, 23 dBm, S3, BER 1e-2. Baseline S0 mengalami outage di jarak ini.",
     )
+    inc_700 = st.session_state.get("inc_700", False)
+    freq_options = (700.0, 900.0, 1800.0) if inc_700 else CFG.carrier_frequencies_mhz
     freq = seg(
         "Frekuensi pembawa (MHz)",
-        list(CFG.carrier_frequencies_mhz),
+        list(freq_options),
         "freq",
-        fmt=lambda x: f"{x:.0f}",
+        fmt=lambda x: "700*" if x == 700.0 else f"{x:.0f}",
     )
     env = seg("Lingkungan propagasi", ["LOS", "NLOS"], "env")
     shadow = seg(
@@ -262,7 +325,11 @@ with st.sidebar:
         fmt=lambda x: "AWGN" if x == "AWGN" else "Rayleigh (CSI sesaat)",
     )
     strat = st.selectbox(
-        "Strategi", list(STRATEGY_LABEL), format_func=STRATEGY_LABEL.get, key="strat"
+        "Strategi",
+        list(STRATEGY_LABEL),
+        format_func=STRATEGY_LABEL.get,
+        key="strat",
+        on_change=sync_zone_strategy,
     )
     manual = strat == "MANUAL"
     st.caption(
@@ -275,24 +342,330 @@ with st.sidebar:
     n_bits = st.select_slider(
         "Bit per kanal (Monte Carlo)", (100_000, 500_000, 1_000_000), key="nbits"
     )
+
+    with st.expander("Sensitivitas eksploratori (opsional)", expanded=False):
+        ber_target = seg(
+            "Target BER",
+            [1e-2, 1e-3],
+            "ber_target",
+            fmt=lambda x: "1e-2 (Primer)" if np.isclose(x, 1e-2) else "1e-3 (Eksploratori)",
+        )
+        inc_700 = st.checkbox(
+            "Sertakan 700 MHz (suplemen terinspirasi Reddy 2022)",
+            key="inc_700",
+            help="Tambahan eksploratori di atas model CI Park (2023). Bukan replikasi Reddy (2022).",
+        )
+        st.caption(
+            "Konfigurasi riset utama: 900/1800 MHz pada BER 1e-2. Ambang 1e-3 dihitung dinamis oleh src/modulation.py."
+        )
+
     st.caption(
-        f"Target BER {CFG.ber_target:g}. Target outage {CFG.outage_target:.0%}. Seed {CFG.default_seed}. Berjalan offline."
+        f"Target BER {ber_target:g}. Target outage {CFG.outage_target:.0%}. Seed {CFG.default_seed}. Berjalan offline."
     )
 
+freq_options = (700.0, 900.0, 1800.0) if inc_700 else CFG.carrier_frequencies_mhz
+if freq not in freq_options:
+    freq = 900.0
+
 try:
-    curves, summary = cached_curves(env, float(ptx))
-    thr = thresholds()
-    link = evaluate_link(freq, env, dist, ptx, shadow, strat, rb_m, mod_m)
+    curves, summary = load_active_curves(freq_options, env, float(ptx), float(ber_target))
+    thr = thresholds(float(ber_target))
+    link = evaluate_link(freq, env, dist, ptx, shadow, strat, rb_m, mod_m, float(ber_target))
 except ValueError as exc:
     st.error(f"Parameter ditolak oleh mesin: {exc}")
     st.stop()
 
-tab_sim, tab_cov, tab_res, tab_met = st.tabs(
-    ["A. Simulator langsung", "B. Visualisasi cakupan", "C. Hasil penelitian", "D. Metodologi"]
+is_exploratory = inc_700 or not np.isclose(ber_target, CFG.ber_target)
+
+tab_wb, tab_res, tab_met = st.tabs(
+    ["A. Workbench interaktif", "B. Hasil penelitian (CSV & PNG)", "C. Metodologi & Batasan"]
 )
 
-# ================================================================== A. LIVE SIMULATOR
-with tab_sim:
+
+def build_snr_figure(
+    freqs: tuple[float, ...], active_freq: float, active_link: dict, thr_map: dict
+) -> go.Figure:
+    fig = go.Figure()
+    off = active_link["margin"]
+    for f in freqs:
+        color = FREQ_COLOR[f]
+        label_prefix = "700 MHz*" if f == 700.0 else f"{f:.0f} MHz"
+        for rb, dash in ((1, "solid"), (25, "dot")):
+            pl_d = np.asarray(median_path_loss_db(DISTANCES_KM * 1000.0, f, env), dtype=float) + off
+            snr_d = np.atleast_1d(compute_link_budget(pl_d, n_rb=rb, tx_power_dbm=ptx).snr_db)
+            is_active_curve = f == active_freq and rb == active_link["rb"]
+            fig.add_scatter(
+                x=DISTANCES_KM,
+                y=snr_d,
+                name=f"{label_prefix}, {rb} RB",
+                line=dict(color=color, dash=dash, width=2.8 if is_active_curve else 1.6),
+                hovertemplate=f"{label_prefix} ({rb} RB)<br>Jarak: %{{x:.2f}} km<br>SNR: %{{y:.2f}} dB<extra></extra>",
+            )
+        if f == active_freq and active_link["rb"] not in (1, 25):
+            rb_a = active_link["rb"]
+            pl_d = np.asarray(median_path_loss_db(DISTANCES_KM * 1000.0, f, env), dtype=float) + off
+            snr_d = np.atleast_1d(compute_link_budget(pl_d, n_rb=rb_a, tx_power_dbm=ptx).snr_db)
+            fig.add_scatter(
+                x=DISTANCES_KM,
+                y=snr_d,
+                name=f"{label_prefix}, {rb_a} RB (aktif)",
+                line=dict(color=color, dash="dash", width=2.6),
+                hovertemplate=f"{label_prefix} ({rb_a} RB)<br>Jarak: %{{x:.2f}} km<br>SNR: %{{y:.2f}} dB<extra></extra>",
+            )
+    for m in CFG.modulations:
+        if m == "BPSK":
+            continue
+        fig.add_hline(
+            y=thr_map[m]["esn0_db"],
+            line_dash="dot",
+            line_color="#94A3B8",
+            line_width=1,
+            annotation_text=f"{m} ({thr_map[m]['esn0_db']:.1f} dB)",
+            annotation_position="top right",
+            annotation_font_size=10,
+            annotation_font_color="#334155",
+        )
+    fig.add_vline(x=dist, line_color=AMBER, line_width=1.6, line_dash="dash")
+    cfg_txt = (
+        "Outage" if not active_link["ok"] else f"{active_link['mod']} x {active_link['rb']} RB"
+    )
+    fig.add_scatter(
+        x=[dist],
+        y=[active_link["snr"]],
+        mode="markers",
+        name=f"Titik aktif ({cfg_txt})",
+        marker=dict(
+            size=10,
+            color=AMBER if active_link["ok"] else "#9A1B1B",
+            line=dict(color=INK, width=1.5),
+        ),
+        hovertemplate=f"Titik aktif {freq_tag(active_freq)}<br>Jarak: {dist:g} km<br>SNR: {active_link['snr']:.2f} dB<br>{cfg_txt}<extra></extra>",
+    )
+    fig.update_layout(
+        height=330,
+        margin=dict(l=10, r=10, t=12, b=10),
+        template="plotly_white",
+        xaxis_title="Jarak (km)",
+        yaxis_title="SNR (dB)",
+        legend=dict(orientation="h", y=-0.26, font=dict(size=10.5)),
+    )
+    return fig
+
+
+def build_constellation_figure(panels: list[tuple[str, dict | None]], ch_key: str) -> go.Figure:
+    fg = make_subplots(
+        rows=1,
+        cols=len(panels),
+        subplot_titles=[p[0] for p in panels],
+        horizontal_spacing=0.10 if len(panels) == 2 else 0.06,
+    )
+    for ci, (_, res) in enumerate(panels, start=1):
+        if res is None:
+            fg.add_annotation(
+                x=0,
+                y=0,
+                text="OUTAGE<br>(tidak ada transmisi)",
+                showarrow=False,
+                font=dict(color="#9A1B1B", size=12),
+                xref=f"x{'' if ci == 1 else ci}",
+                yref=f"y{'' if ci == 1 else ci}",
+            )
+            fg.update_xaxes(range=[-1.6, 1.6], row=1, col=ci, title_text="I")
+            fg.update_yaxes(
+                range=[-1.6, 1.6], row=1, col=ci, scaleanchor=f"x{'' if ci == 1 else ci}"
+            )
+            continue
+        smp = res[f"samples_{ch_key}"]
+        ref, _ = get_constellation(res["modulation"])
+        fg.add_trace(
+            go.Scatter(
+                x=smp.real,
+                y=smp.imag,
+                mode="markers",
+                name="diterima (SIMULATED)",
+                legendgroup="sim",
+                showlegend=ci == 1,
+                marker=dict(size=3.8, color=AMBER, opacity=0.55),
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=ci,
+        )
+        fg.add_trace(
+            go.Scatter(
+                x=np.real(ref),
+                y=np.imag(ref),
+                mode="markers",
+                name="ideal",
+                legendgroup="ideal",
+                showlegend=ci == 1,
+                marker=dict(size=8, color=NAVY, symbol="x"),
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=ci,
+        )
+        fg.update_xaxes(title_text="I", range=[-1.8, 1.8], row=1, col=ci)
+        fg.update_yaxes(
+            title_text="Q" if ci == 1 else "",
+            range=[-1.8, 1.8],
+            row=1,
+            col=ci,
+            scaleanchor=f"x{'' if ci == 1 else ci}",
+        )
+    fg.update_layout(
+        height=265,
+        margin=dict(l=10, r=10, t=30, b=10),
+        template="plotly_white",
+        legend=dict(orientation="h", y=-0.28, font=dict(size=10.5)),
+    )
+    return fg
+
+
+def build_coverage_figure(
+    freqs: tuple[float, ...],
+    curves_df: pd.DataFrame,
+    summary_df: pd.DataFrame,
+    zsc: str,
+    ue_dist_km: float,
+) -> go.Figure:
+    titles = [f"{freq_tag(f)} | {env}, {zsc}" for f in freqs]
+    fg = make_subplots(
+        rows=1,
+        cols=len(freqs),
+        subplot_titles=titles,
+        horizontal_spacing=0.06 if len(freqs) == 2 else 0.045,
+    )
+    seen: set[str] = set()
+    theta = np.linspace(0, 2 * np.pi, 181)
+    rmax = float(CFG.distance_max_km)
+
+    for ci, f in enumerate(freqs, start=1):
+        g = curves_df[(curves_df.freq_mhz == f) & (curves_df.scenario == zsc)].sort_values(
+            "distance_km"
+        )
+        labels = np.where(g.median_feasible, g.median_modulation, "Outage").tolist()
+        d = g.distance_km.to_numpy()
+        zones, start = [], 0
+        for i in range(1, len(labels) + 1):
+            if i == len(labels) or labels[i] != labels[start]:
+                inner = 0.0 if start == 0 else float(d[start]) - 0.125
+                outer = min(rmax, float(d[i - 1]) + 0.125)
+                zones.append((inner, outer, labels[start]))
+                start = i
+        for inner, outer, lab in reversed(zones):
+            fg.add_trace(
+                go.Scatter(
+                    x=outer * np.cos(theta),
+                    y=outer * np.sin(theta),
+                    mode="lines",
+                    fill="toself",
+                    fillcolor=MOD_COLOR[lab],
+                    line=dict(color="#FFFFFF", width=1),
+                    name=lab,
+                    legendgroup=lab,
+                    showlegend=lab not in seen,
+                    hoverinfo="name+text",
+                    text=f"{lab}: {inner:.2f} s.d. {outer:.2f} km",
+                ),
+                row=1,
+                col=ci,
+            )
+            seen.add(lab)
+        srow = summary_df[(summary_df.freq_mhz == f) & (summary_df.scenario == zsc)].iloc[0]
+        for rad, lab, color, dash in (
+            (
+                srow.radius_stochastic_km,
+                "Batas 95% andal (shadowing)",
+                NAVY,
+                "dash",
+            ),
+            (
+                srow.radius_fading_km,
+                "Batas 95% andal (+Rayleigh CSI)",
+                AMBER,
+                "dot",
+            ),
+        ):
+            if rad > 0:
+                fg.add_trace(
+                    go.Scatter(
+                        x=float(rad) * np.cos(theta),
+                        y=float(rad) * np.sin(theta),
+                        mode="lines",
+                        line=dict(color=color, dash=dash, width=2.3),
+                        name=lab,
+                        legendgroup=lab,
+                        showlegend=lab not in seen,
+                        hoverinfo="name+text",
+                        text=f"{f:.0f} MHz: {srow.radius_stochastic_label if dash == 'dash' else srow.radius_fading_label}",
+                    ),
+                    row=1,
+                    col=ci,
+                )
+                seen.add(lab)
+        fg.add_trace(
+            go.Scatter(
+                x=[0],
+                y=[0],
+                mode="markers+text",
+                text=["BTS"],
+                textposition="bottom center",
+                marker=dict(size=9, color=INK, symbol="diamond"),
+                name="BTS",
+                showlegend=ci == 1,
+                legendgroup="BTS",
+            ),
+            row=1,
+            col=ci,
+        )
+        fg.add_trace(
+            go.Scatter(
+                x=[ue_dist_km],
+                y=[0],
+                mode="markers+text",
+                text=[f"UE {ue_dist_km:g} km"],
+                textposition="top center",
+                marker=dict(size=9, color="#FFFFFF", line=dict(color=INK, width=2)),
+                name="UE",
+                showlegend=ci == 1,
+                legendgroup="UE",
+            ),
+            row=1,
+            col=ci,
+        )
+        fg.update_xaxes(
+            range=[-13.2, 13.2], title_text="km", row=1, col=ci, zeroline=False, constrain="domain"
+        )
+        fg.update_yaxes(
+            range=[-13.2, 13.2],
+            row=1,
+            col=ci,
+            scaleanchor=f"x{'' if ci == 1 else ci}",
+            scaleratio=1,
+            constrain="domain",
+            zeroline=False,
+        )
+    fg.update_layout(
+        height=350,
+        margin=dict(l=10, r=10, t=32, b=10),
+        template="plotly_white",
+        legend=dict(orientation="h", y=-0.18, font=dict(size=10.5)),
+    )
+    return fg
+
+
+# ================================================================== A. INTERACTIVE WORKBENCH
+with tab_wb:
+    if is_exploratory:
+        st.markdown(
+            '<div class="rl-note rl-note-exp"><b>Mode sensitivitas eksploratori aktif.</b> '
+            f"Frekuensi aktif: {', '.join(f'{f:.0f}' for f in freq_options)} MHz; target BER: {ber_target:g}. "
+            "700 MHz terinspirasi Reddy (2022) di atas model CI Park (2023) dan bukan replikasi Reddy. "
+            "Konfigurasi riset utama tetap 900/1800 MHz pada BER 1e-2 (Tab B tidak berubah).</div>",
+            unsafe_allow_html=True,
+        )
+
     row = curves[
         (curves.freq_mhz == freq)
         & (curves.environment == env)
@@ -301,7 +674,7 @@ with tab_sim:
     cur = row.loc[strat] if strat in row.index else None
     in_outage = not link["ok"]
     ber_main = link.get("ber_awgn") if chan == "AWGN" else link.get("ber_ray")
-    ber_label = "BER analitis AWGN" if chan == "AWGN" else "BER rata-rata Rayleigh tanpa CSI"
+    ber_label = "BER AWGN" if chan == "AWGN" else "BER Rayleigh (tanpa CSI)"
     if cur is None:
         outage_txt, outage_sub = "n/a", "mode manual"
     elif chan == "AWGN":
@@ -309,189 +682,200 @@ with tab_sim:
     else:
         outage_txt, outage_sub = (
             f"{cur.fading_outage_prob:.1%}",
-            "SIMULATED, shadowing + Rayleigh CSI",
+            "SIMULATED, +Rayleigh CSI",
         )
+
     strip(
         [
             (
-                "Path loss CI (THEORETICAL)",
+                "Path loss CI",
                 f"{link['pl']:.1f} dB",
-                f"margin shadowing {link['margin']:.1f} dB",
+                f"margin {link['margin']:.1f} dB (THEORETICAL)",
                 "",
             ),
-            ("Daya terima Pr", f"{link['pr']:.1f} dBm", f"P per RB {link['p_rb']:.1f} dBm", ""),
+            ("Daya terima Pr", f"{link['pr']:.1f} dBm", f"P/RB {link['p_rb']:.1f} dBm", ""),
             (
                 "Noise floor",
                 f"{link['noise']:.1f} dBm",
-                f"B aktif {link['b_hz'] / 1e6:.2f} MHz",
+                f"B {link['b_hz'] / 1e6:.2f} MHz",
                 "",
             ),
             (
                 "SNR (Es/N0)",
                 f"{link['snr']:.1f} dB",
-                f"Eb/N0 {link['ebn0']:.1f} dB" if not in_outage else "tanpa konfigurasi layak",
+                f"Eb/N0 {link['ebn0']:.1f} dB" if not in_outage else "tanpa opsi layak",
                 "",
             ),
             (
                 "Konfigurasi aktif",
                 "Outage" if in_outage else f"{link['mod']} x {link['rb']} RB",
-                "optimizer" if not manual else "manual",
+                "manual" if manual else f"optimizer ({strat})",
                 "rl-bad" if in_outage else "",
             ),
             (
                 ber_label,
                 "n/a" if in_outage or ber_main is None else f"{ber_main:.2e}",
-                f"target {CFG.ber_target:g}",
+                f"target {ber_target:g}",
                 "",
             ),
-            ("Laju nominal", fmt_rate(link["rate"]), "tanpa coding, bukan throughput LTE", ""),
+            ("Laju nominal", fmt_rate(link["rate"]), "tanpa coding (bukan LTE)", ""),
             ("Probabilitas outage", outage_txt, outage_sub, "rl-sim"),
         ]
     )
+
     if manual and not link["ok"] and link["mod"] != "Outage":
         st.warning(
             f"Konfigurasi manual tidak layak: Eb/N0 {link['ebn0']:.1f} dB lebih rendah dari ambang "
-            f"{thr[link['mod']]['ebn0_db']:.2f} dB untuk {link['mod']}. Link dinyatakan outage."
+            f"{thr[link['mod']]['ebn0_db']:.2f} dB untuk {link['mod']} (BER {ber_target:g}). Link dinyatakan outage."
         )
     if in_outage and not manual:
         st.error(
             "Tidak ada kombinasi modulasi dan RB yang memenuhi BER target pada jarak ini. Coba kurangi jarak atau naikkan daya."
         )
 
-    c1, c2 = st.columns([1.15, 1])
+    # Row 1: SNR vs Distance (left) + Bit-level MC & Side-by-side Constellations (right)
+    c1, c2 = st.columns([1.1, 1], gap="medium")
     with c1:
-        st.markdown("**SNR vs jarak (median path loss, THEORETICAL)**")
-        _, sig = get_ci_parameters(env)
-        off = link["margin"]
-        fig = go.Figure()
-        styles = {
-            (900.0, 1): (NAVY, "solid"),
-            (900.0, 25): (NAVY, "dot"),
-            (1800.0, 1): (TEAL, "solid"),
-            (1800.0, 25): (TEAL, "dot"),
-        }
-        for (f, rb), (color, dash) in styles.items():
-            pl_d = np.asarray(median_path_loss_db(DISTANCES_KM * 1000.0, f, env), dtype=float) + off
-            snr_d = np.atleast_1d(compute_link_budget(pl_d, n_rb=rb, tx_power_dbm=ptx).snr_db)
-            fig.add_scatter(
-                x=DISTANCES_KM,
-                y=snr_d,
-                name=f"{f:.0f} MHz, {rb} RB",
-                line=dict(color=color, dash=dash, width=2),
-            )
-        for m in CFG.modulations:
-            if m == "BPSK":
-                continue
-            fig.add_hline(
-                y=thr[m]["esn0_db"],
-                line_dash="dot",
-                line_color="#94A3B8",
-                line_width=1,
-                annotation_text=f"{m} (Es/N0 {thr[m]['esn0_db']:.1f} dB)",
-                annotation_position="top right",
-                annotation_font_size=10,
-            )
-        fig.add_vline(x=dist, line_color=AMBER, line_width=1.5)
-        fig.update_layout(
-            height=360,
-            margin=dict(l=10, r=10, t=10, b=10),
-            template="plotly_white",
-            xaxis_title="Jarak (km)",
-            yaxis_title="SNR (dB)",
-            legend=dict(orientation="h", y=-0.25),
+        st.markdown(
+            f'<div class="rl-sec">SNR vs jarak ({env}, margin {link["margin"]:.1f} dB, THEORETICAL)</div>',
+            unsafe_allow_html=True,
         )
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(build_snr_figure(freq_options, freq, link, thr), width="stretch")
         st.caption(
-            "Garis penuh: 1 RB (jangkauan maksimum). Titik: 25 RB. Garis abu: ambang Es/N0 pada BER 1e-2 (QPSK sama dengan BPSK pada Eb/N0, berbeda 3 dB pada Es/N0)."
+            f"Garis penuh: 1 RB (jangkauan maks). Titik: 25 RB. Garis horizontal: ambang Es/N0 pada BER {ber_target:g}. "
+            "Garis putus amber: jarak UE aktif."
         )
+
     with c2:
-        st.markdown("**Simulasi Monte Carlo bit-level (SIMULATED)**")
-        base = evaluate_link(freq, env, dist, ptx, shadow, "S0", rb_m, mod_m)
-        st.write(
-            f"Dioptimalkan: **{'Outage' if in_outage else link['mod'] + ' x ' + str(link['rb']) + ' RB'}**. "
-            f"Baseline S0: **{'Outage' if not base['ok'] else 'QPSK x 25 RB'}**."
+        st.markdown(
+            '<div class="rl-sec">Monte Carlo bit-level & konstelasi diterima (SIMULATED)</div>',
+            unsafe_allow_html=True,
         )
-        key_now = (freq, env, dist, ptx, shadow, strat, rb_m, mod_m, n_bits)
-        if st.button("Jalankan simulasi Monte Carlo", key="run_mc", disabled=in_outage):
+        base = evaluate_link(freq, env, dist, ptx, shadow, "S0", rb_m, mod_m, float(ber_target))
+        mc_ctl1, mc_ctl2 = st.columns([1, 1.15])
+        mc_ctl1.write(
+            f"Aktif: **{'Outage' if in_outage else link['mod'] + ' x ' + str(link['rb']) + ' RB'}** | "
+            f"S0: **{'Outage' if not base['ok'] else 'QPSK x 25 RB'}**"
+        )
+        run_clicked = mc_ctl2.button(
+            "Jalankan Monte Carlo",
+            key="run_mc",
+            disabled=in_outage,
+            width="stretch",
+        )
+        key_now = (
+            freq,
+            env,
+            dist,
+            ptx,
+            shadow,
+            strat,
+            rb_m,
+            mod_m,
+            n_bits,
+            float(ber_target),
+            freq_options,
+        )
+        if run_clicked:
+            by_freq = {}
+            for f_item in freq_options:
+                lk_f = evaluate_link(
+                    f_item,
+                    env,
+                    dist,
+                    ptx,
+                    shadow,
+                    "S3" if strat == "MANUAL" else strat,
+                    rb_m,
+                    mod_m,
+                    float(ber_target),
+                )
+                by_freq[f_item] = (
+                    cached_mc(lk_f["mod"], lk_f["ebn0"], int(n_bits)) if lk_f["ok"] else None
+                )
             st.session_state["mc"] = {
                 "key": key_now,
                 "opt": cached_mc(link["mod"], link["ebn0"], int(n_bits)),
                 "base": cached_mc(base["mod"], base["ebn0"], int(n_bits)) if base["ok"] else None,
+                "by_freq": by_freq,
             }
+
         mc = st.session_state.get("mc")
         if in_outage:
             st.info("Tidak ada transmisi yang dapat disimulasikan pada konfigurasi outage.")
         elif mc is None:
             st.info(
-                "Tekan tombol untuk mengirim bit acak melalui kanal AWGN dan Rayleigh dari mesin Python."
-            )
-        elif mc["key"] != key_now:
-            st.warning(
-                "Parameter berubah sejak simulasi terakhir. Jalankan ulang untuk memperbarui hasil."
+                f"Belum dijalankan. Tekan Jalankan Monte Carlo untuk mengirim {n_bits:,} bit acak "
+                "melalui kanal AWGN dan Rayleigh di mesin Python."
             )
         else:
+            if mc["key"] != key_now:
+                st.warning(
+                    "Parameter berubah sejak simulasi terakhir. Jalankan ulang untuk memperbarui hasil."
+                )
             ch = "awgn" if chan == "AWGN" else "rayleigh"
+            view_mode = seg(
+                "Tampilan konstelasi",
+                ["Dioptimalkan vs S0", "Antar Frekuensi"],
+                "mc_view",
+            )
             for name, res in (("Dioptimalkan", mc["opt"]), ("Baseline S0", mc["base"])):
                 if res is None:
-                    st.write(f"**{name}**: outage, tidak ada transmisi.")
+                    st.caption(f"**{name}**: outage, tidak ada transmisi.")
                     continue
                 ci = res[f"ci_low_{ch}"], res[f"ci_high_{ch}"]
                 ci_txt = "" if ci[0] is None else f", CI 95% [{ci[0]:.1e}, {ci[1]:.1e}]"
-                st.write(
+                st.caption(
                     f"**{name}** ({res['modulation']}, Eb/N0 {res['ebn0_db']:.2f} dB, {res['n_bits']:,} bit): "
                     f"BER MC AWGN {res['mc_ber_awgn']:.2e} (teori {res['theory_ber_awgn']:.2e}); "
-                    f"BER MC Rayleigh tanpa CSI {res['mc_ber_rayleigh']:.2e} (teori {res['theory_ber_rayleigh']:.2e}){ci_txt}."
+                    f"Rayleigh tanpa CSI {res['mc_ber_rayleigh']:.2e} (teori {res['theory_ber_rayleigh']:.2e}){ci_txt}."
                 )
-            st.caption(
-                "Rayleigh tanpa CSI adalah BER rata-rata atas seluruh fading. Dengan CSI sesaat, link hanya mengirim "
-                "saat Eb/N0 sesaat memenuhi ambang, sehingga BER bersyarat paling tinggi 1e-2 (lihat outage di strip)."
-            )
+            if view_mode == "Dioptimalkan vs S0":
+                panels = [
+                    (f"Dioptimalkan: {mc['opt']['modulation']}", mc["opt"]),
+                    (
+                        f"Baseline S0: {mc['base']['modulation'] if mc['base'] else 'Outage'}",
+                        mc["base"],
+                    ),
+                ]
+            else:
+                by_freq = mc.get("by_freq", {})
+                panels = [
+                    (
+                        f"{freq_tag(f_item)}: {by_freq[f_item]['modulation'] if by_freq.get(f_item) else 'Outage'}",
+                        by_freq.get(f_item),
+                    )
+                    for f_item in freq_options
+                ]
+            st.plotly_chart(build_constellation_figure(panels, ch), width="stretch")
 
-    mc = st.session_state.get("mc")
-    if mc and mc["key"] == key_now and not in_outage:
-        st.markdown(
-            f"**Konstelasi diterima, kanal {'AWGN' if chan == 'AWGN' else 'Rayleigh (diekualisasi ZF)'}: sampel nyata dari mesin Python**"
-        )
-        ch = "awgn" if chan == "AWGN" else "rayleigh"
-        cols = st.columns(2)
-        for col, name, res in (
-            (cols[0], "Dioptimalkan", mc["opt"]),
-            (cols[1], "Baseline S0", mc["base"]),
-        ):
-            if res is None:
-                col.info(f"{name}: outage, tidak ada sampel.")
-                continue
-            smp = res[f"samples_{ch}"]
-            ref, _ = get_constellation(res["modulation"])
-            f4 = go.Figure()
-            f4.add_scatter(
-                x=smp.real,
-                y=smp.imag,
-                mode="markers",
-                name="diterima (SIMULATED)",
-                marker=dict(size=4, color=AMBER, opacity=0.55),
-            )
-            f4.add_scatter(
-                x=np.real(ref),
-                y=np.imag(ref),
-                mode="markers",
-                name="titik ideal",
-                marker=dict(size=9, color=NAVY, symbol="x"),
-            )
-            f4.update_layout(
-                height=330,
-                margin=dict(l=10, r=10, t=30, b=10),
-                template="plotly_white",
-                title=f"{name}: {res['modulation']}",
-                xaxis_title="I",
-                yaxis_title="Q",
-                yaxis_scaleanchor="x",
-                legend=dict(orientation="h", y=-0.25),
-            )
-            col.plotly_chart(f4, width="stretch")
+    # Row 2: Side-by-side radial modulation coverage maps on primary dashboard
+    z_hdr1, z_hdr2 = st.columns([2.2, 1])
+    z_hdr1.markdown(
+        '<div class="rl-sec">Peta zona modulasi radial sisi-ke-sisi (model hipotetis 1-12 km, bukan peta lapangan)</div>',
+        unsafe_allow_html=True,
+    )
+    if st.session_state.get("zone_sc") not in SCENARIOS:
+        st.session_state["zone_sc"] = "S3"
+    zsc = z_hdr2.selectbox(
+        "Strategi peta zona",
+        list(SCENARIOS),
+        format_func=lambda s: f"{s}: {SCENARIOS[s]['label']}",
+        key="zone_sc",
+        label_visibility="collapsed",
+    )
+    st.plotly_chart(
+        build_coverage_figure(freq_options, curves, summary, zsc, dist), width="stretch"
+    )
+    st.caption(
+        "Cincin berwarna: zona median PL (deterministik, THEORETICAL). Garis putus: batas andal outage <=5% "
+        "(SIMULATED, realisasi acak bersama). Radius 12 km tersensor kanan (>=12 km)."
+    )
 
+    # Row 3: Fixed vs Adaptive Strategy Comparison & Frequency Comparison Table (full width for readability)
     st.markdown(
-        f"**Perbandingan strategi pada {dist:g} km, {freq:.0f} MHz {env}** (realisasi shadowing dan fading yang sama untuk semua strategi)"
+        f'<div class="rl-sec">Fixed vs adaptif pada {dist:g} km, {freq_tag(freq)} {env}</div>',
+        unsafe_allow_html=True,
     )
     r = row.reset_index()
     tbl = pd.DataFrame(
@@ -504,29 +888,31 @@ with tab_sim:
                 )
             ],
             "Laju median (Mbit/s)": (r.median_rate_bps / 1e6).round(2),
-            "Outage shadowing": (r.shadow_outage_prob * 100).round(1).astype(str) + "%",
-            "Outage shadowing+Rayleigh CSI": (r.fading_outage_prob * 100).round(1).astype(str)
-            + "%",
+            "Outage shadow": (r.shadow_outage_prob * 100).round(1).astype(str) + "%",
+            "Outage +Rayleigh CSI": (r.fading_outage_prob * 100).round(1).astype(str) + "%",
             "Laju efektif CSI (Mbit/s)": (r.fading_effective_rate_bps / 1e6).round(2),
-            "BER bersyarat rata-rata": r.fading_cond_ber_mean.map(
+            "BER bersyarat": r.fading_cond_ber_mean.map(
                 lambda x: "n/a" if pd.isna(x) else f"{x:.1e}"
             ),
         }
     )
     st.dataframe(tbl, hide_index=True, width="stretch")
     st.caption(
-        "Laju efektif menghitung outage sebagai 0. Laju nominal tanpa coding, bukan throughput LTE."
+        "Semua strategi memakai realisasi shadowing & Rayleigh yang sama. Laju efektif menghitung outage sebagai 0."
     )
 
-    st.markdown("**Perbandingan frekuensi pada jarak yang sama**")
+    st.markdown(
+        f'<div class="rl-sec">Perbandingan frekuensi pada {dist:g} km ({env}, seed identik {CFG.default_seed})</div>',
+        unsafe_allow_html=True,
+    )
     ft = []
-    for f in CFG.carrier_frequencies_mhz:
-        lk = evaluate_link(f, env, dist, ptx, shadow, "S3", rb_m, mod_m)
+    for f in freq_options:
+        lk = evaluate_link(f, env, dist, ptx, shadow, "S3", rb_m, mod_m, float(ber_target))
         s3 = summary[(summary.freq_mhz == f) & (summary.scenario == "S3")].iloc[0]
         ft.append(
             {
-                "Frekuensi": f"{f:.0f} MHz",
-                "Path loss (dB)": round(lk["pl"], 1),
+                "Frekuensi": freq_tag(f),
+                "PL (dB)": round(lk["pl"], 1),
                 "SNR 25 RB (dB)": round(
                     float(compute_link_budget(lk["pl"], n_rb=25, tx_power_dbm=ptx).snr_db), 1
                 ),
@@ -534,173 +920,22 @@ with tab_sim:
                     float(compute_link_budget(lk["pl"], n_rb=1, tx_power_dbm=ptx).snr_db), 1
                 ),
                 "Pilihan S3": "Outage" if lk["mod"] == "Outage" else f"{lk['mod']} x {lk['rb']} RB",
-                "Laju nominal": fmt_rate(lk["rate"]),
+                "Laju S3": fmt_rate(lk["rate"]),
                 "Radius median S3": s3.radius_median_label,
-                "Radius 5% outage + fading": s3.radius_fading_label,
+                "Radius andal 95% (+fading)": s3.radius_fading_label,
             }
         )
     st.dataframe(pd.DataFrame(ft), hide_index=True, width="stretch")
-
-# ================================================================== B. COVERAGE
-with tab_cov:
-    st.markdown(
-        '<div class="rl-note"><b>Model radial hipotetis.</b> Bukan peta cakupan geografis lapangan. '
-        "Zona modulasi dihitung sekali per jarak radial (45 titik, 1 sampai 12 km) oleh optimizer Python, "
-        "lalu digambar sebagai cincin konsentris tanpa medan, halangan, atau sektor antena.</div>",
-        unsafe_allow_html=True,
-    )
-    zsc = st.selectbox(
-        "Strategi zona",
-        list(SCENARIOS),
-        index=3,
-        format_func=lambda s: f"{s}: {SCENARIOS[s]['label']}",
-        key="zone_sc",
-    )
-    fig = make_subplots(
-        rows=1,
-        cols=2,
-        subplot_titles=[f"{f:.0f} MHz {env}, {zsc}" for f in CFG.carrier_frequencies_mhz],
-        horizontal_spacing=0.06,
-    )
-    seen: set[str] = set()
-    theta = np.linspace(0, 2 * np.pi, 181)
-
-    def circle(rad: float) -> tuple[np.ndarray, np.ndarray]:
-        return rad * np.cos(theta), rad * np.sin(theta)
-
-    rmax = float(CFG.distance_max_km)
-    for ci, f in enumerate(CFG.carrier_frequencies_mhz, start=1):
-        g = curves[(curves.freq_mhz == f) & (curves.scenario == zsc)].sort_values("distance_km")
-        labels = np.where(g.median_feasible, g.median_modulation, "Outage").tolist()
-        d = g.distance_km.to_numpy()
-        zones, start = [], 0
-        for i in range(1, len(labels) + 1):
-            if i == len(labels) or labels[i] != labels[start]:
-                inner = 0.0 if start == 0 else float(d[start]) - 0.125
-                outer = min(rmax, float(d[i - 1]) + 0.125)
-                zones.append((inner, outer, labels[start]))
-                start = i
-        for inner, outer, lab in reversed(zones):
-            x, y = circle(outer)
-            fig.add_trace(
-                go.Scatter(
-                    x=x,
-                    y=y,
-                    mode="lines",
-                    fill="toself",
-                    fillcolor=MOD_COLOR[lab],
-                    line=dict(color="#FFFFFF", width=1),
-                    name=lab,
-                    legendgroup=lab,
-                    showlegend=lab not in seen,
-                    hoverinfo="name+text",
-                    text=f"{lab}: {inner:.2f} a {outer:.2f} km",
-                ),
-                row=1,
-                col=ci,
-            )
-            seen.add(lab)
-        srow = summary[(summary.freq_mhz == f) & (summary.scenario == zsc)].iloc[0]
-        for rad, lab, color, dash in (
-            (
-                srow.radius_stochastic_km,
-                f"Radius andal 95% (shadowing) {srow.radius_stochastic_label}",
-                NAVY,
-                "dash",
-            ),
-            (
-                srow.radius_fading_km,
-                f"Radius andal 95% (+Rayleigh CSI) {srow.radius_fading_label}",
-                AMBER,
-                "dot",
-            ),
-        ):
-            if rad > 0:
-                x, y = circle(float(rad))
-                fig.add_trace(
-                    go.Scatter(
-                        x=x,
-                        y=y,
-                        mode="lines",
-                        line=dict(color=color, dash=dash, width=2.5),
-                        name=f"{f:.0f} MHz: {lab}",
-                        hoverinfo="name",
-                    ),
-                    row=1,
-                    col=ci,
-                )
-        fig.add_trace(
-            go.Scatter(
-                x=[0],
-                y=[0],
-                mode="markers+text",
-                text=["BTS"],
-                textposition="bottom center",
-                marker=dict(size=11, color=INK, symbol="diamond"),
-                name="BTS",
-                showlegend=ci == 1,
-                legendgroup="BTS",
-            ),
-            row=1,
-            col=ci,
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=[dist],
-                y=[0],
-                mode="markers+text",
-                text=[f"UE {dist:g} km"],
-                textposition="top center",
-                marker=dict(size=11, color="#FFFFFF", line=dict(color=INK, width=2.5)),
-                name="UE",
-                showlegend=ci == 1,
-                legendgroup="UE",
-            ),
-            row=1,
-            col=ci,
-        )
-    for ci in (1, 2):
-        fig.update_xaxes(range=[-13, 13], title_text="km", row=1, col=ci, zeroline=False)
-        fig.update_yaxes(
-            range=[-13, 13], row=1, col=ci, scaleanchor=f"x{'' if ci == 1 else ci}", zeroline=False
-        )
-    fig.update_layout(
-        height=520,
-        margin=dict(l=10, r=10, t=40, b=10),
-        template="plotly_white",
-        legend=dict(orientation="h", y=-0.12),
-    )
-    st.plotly_chart(fig, width="stretch")
     st.caption(
-        "Cincin berwarna: zona median path loss (deterministik, THEORETICAL). Garis putus-putus: radius dengan outage 5% atau kurang "
-        "(SIMULATED, realisasi acak bersama). Abu-abu: outage. Radius 12 km adalah batas rentang evaluasi, ditandai '>=12 km' bila tercapai."
+        "Kondisi propagasi CI dan realisasi kanal acak identik antar frekuensi untuk perbandingan setara."
     )
-    zt = summary[summary.scenario == zsc][
-        [
-            "freq_mhz",
-            "radius_median_label",
-            "radius_margin95_label",
-            "radius_stochastic_label",
-            "radius_fading_label",
-        ]
-    ]
-    zt = zt.rename(
-        columns={
-            "freq_mhz": "MHz",
-            "radius_median_label": "Median PL (deterministik)",
-            "radius_margin95_label": "Margin 95% (analitis)",
-            "radius_stochastic_label": "Andal 95%, shadowing",
-            "radius_fading_label": "Andal 95%, shadowing + Rayleigh CSI",
-        }
-    )
-    st.dataframe(zt, hide_index=True, width="stretch")
 
-# ================================================================== C. RESULTS
+# ================================================================== B. RESULTS
 with tab_res:
     st.markdown(
-        '<div class="rl-note">Hasil publikasi dibaca dari <code>outputs/</code> (23 dBm, seed 42, 5000 realisasi bersama, '
-        "grid 1 sampai 12 km). Label: THEORETICAL = median path loss dan rumus tertutup. SIMULATED = shadowing, Rayleigh, dan Monte Carlo bit-level. "
-        "Laju nominal tanpa coding, bukan throughput LTE.</div>",
+        '<div class="rl-note">Hasil publikasi dibaca langsung dari <code>outputs/</code> (900/1800 MHz, 23 dBm, '
+        "BER 1e-2, seed 42, 5000 realisasi bersama, grid 1 sampai 12 km). Label: THEORETICAL = median path loss dan rumus tertutup. "
+        "SIMULATED = shadowing, Rayleigh, dan Monte Carlo bit-level. Laju nominal tanpa coding, bukan throughput LTE.</div>",
         unsafe_allow_html=True,
     )
     pub_curves, pub_sum, pub_cmp, pub_mc = (
@@ -768,7 +1003,7 @@ with tab_res:
                             col=ci,
                         )
                 fg.update_layout(
-                    height=340,
+                    height=330,
                     margin=dict(l=10, r=10, t=40, b=10),
                     template="plotly_white",
                     title=dict(text=ttl, font_size=13),
@@ -869,7 +1104,7 @@ with tab_res:
             with st.expander("Ringkasan numerik lengkap (outputs/summary.md)"):
                 st.markdown(sm.read_text(encoding="utf-8"))
 
-# ================================================================== D. METHODOLOGY
+# ================================================================== C. METHODOLOGY
 with tab_met:
     st.markdown("#### Model dan persamaan")
     st.latex(r"PL(d) = FSPL(1\,\mathrm{m}, f) + 10\,n\,\log_{10}(d) + X_\sigma")
@@ -882,7 +1117,7 @@ with tab_met:
 - **Propagasi:** Close-In (CI) dengan parameter LOS n=2,16, sigma=3,07 dB dan NLOS n=2,56, sigma=11,40 dB (Park 2023, ekstrapolasi dari 1400 MHz, keputusan D8).
 - **Link budget:** UE {CFG.ue_tx_power_dbm:.0f} dBm (maks), Gr {CFG.bts_rx_antenna_gain_dbi:.0f} dBi, feeder {CFG.feeder_loss_db:.0f} dB, tubuh {CFG.body_loss_db:.0f} dB, NF {CFG.rx_noise_figure_db:.0f} dB. Daya terbagi rata pada RB aktif, sehingga gain bandwidth hanya dihitung sekali.
 - **BER:** Gray-coded eksak (Cho dan Yoon 2002), Monte Carlo bit-level pada kanal AWGN dan Rayleigh independen dengan ekualisasi ZF.
-- **Ambang BER {CFG.ber_target:g}:** Eb/N0 (dB) {", ".join(f"{m} {thr[m]['ebn0_db']:.2f}" for m in CFG.modulations)}. Es/N0 = Eb/N0 + 10 log10 k.
+- **Ambang BER {ber_target:g} (aktif):** Eb/N0 (dB) {", ".join(f"{m} {thr[m]['ebn0_db']:.2f}" for m in CFG.modulations)}. Es/N0 = Eb/N0 + 10 log10 k.
 - **Optimasi modulasi-bandwidth:** tiap opsi (modulasi, N_RB) layak bila Eb/N0 memenuhi ambang. Optimizer memilih opsi layak dengan laju nominal B x log2 M tertinggi. Mengurangi RB menaikkan SNR per simbol (daya terkonsentrasi, noise lebih kecil) dengan mengorbankan laju, sehingga jangkauan membesar.
 - **Rayleigh:** adaptasi memakai CSI sesaat. Pada tiap realisasi, link memilih opsi dengan Eb/N0 sesaat yang memenuhi ambang AWGN. BER bersyarat adalah BER AWGN pada Eb/N0 sesaat tersebut. BER rata-rata Rayleigh tanpa CSI tidak dipakai untuk adaptasi.
 - **Strategi:** {"; ".join(f"{k} {v['label']}" for k, v in SCENARIOS.items())}. Semua strategi memakai realisasi shadowing dan fading yang sama.
@@ -892,7 +1127,7 @@ with tab_met:
     st.markdown("#### Batasan")
     st.markdown(
         """
-- Hanya 900 dan 1800 MHz. 700 MHz di luar cakupan penelitian.
+- Konfigurasi riset utama adalah 900 dan 1800 MHz pada BER 1e-2. Opsi 700 MHz (terinspirasi Reddy 2022) dan BER 1e-3 di panel sensitivitas adalah analisis eksploratori, bukan replikasi Reddy (2022).
 - Laju nominal tanpa channel coding, overhead, dan penjadwalan. Bukan throughput LTE.
 - Parameter CI diekstrapolasi dari kampanye Park (2023), belum ada data lapangan Indonesia.
 - Tampilan zona adalah model radial hipotetis, bukan prediksi cakupan geografis.
