@@ -478,6 +478,18 @@
       ctx.fillText(`${d} km`, px, H - 18);
     }
 
+    const drawCrispLabel = (text, x, y, align, fillColor) => {
+      ctx.save();
+      ctx.textAlign = align;
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.strokeText(text, x, y);
+      ctx.fillStyle = fillColor;
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    };
+
     ["QPSK", "16-QAM", "64-QAM"].forEach((mod) => {
       const th = data.thresholds[mod];
       if (!th) return;
@@ -491,9 +503,7 @@
       ctx.lineTo(W - pad.r, py);
       ctx.stroke();
       ctx.restore();
-      ctx.fillStyle = "#334155";
-      ctx.textAlign = "right";
-      ctx.fillText(`${mod} (${th.esn0_db.toFixed(1)} dB)`, W - pad.r - 4, py - 4);
+      drawCrispLabel(`${mod} (${th.esn0_db.toFixed(1)} dB)`, W - pad.r - 4, py - 4, "right", "#334155");
     });
 
     const dists = data.distances_km;
@@ -557,12 +567,11 @@
     ctx.stroke();
 
     // Compact readout tag beside dragged marker
-    ctx.fillStyle = "#0F172A";
     ctx.font = "bold 11px sans-serif";
-    ctx.textAlign = cx > W - 120 ? "right" : "left";
+    const align = cx > W - 120 ? "right" : "left";
     const tagX = cx > W - 120 ? cx - 10 : cx + 10;
-    const tagY = Math.max(pad.t + 14, Math.min(H - pad.b - 6, pyAct - 8));
-    ctx.fillText(`${fmtIdNum(state.dist_km, 2)} km · ${fmtIdNum(activeSnr, 1)} dB`, tagX, tagY);
+    const tagY = Math.max(pad.t + 14, Math.min(H - pad.b - 6, pyAct - 10));
+    drawCrispLabel(`${fmtIdNum(state.dist_km, 2)} km · ${fmtIdNum(activeSnr, 1)} dB`, tagX, tagY, align, "#0F172A");
 
     // Legend
     [700, 900, 1800].forEach((f, idx) => {
