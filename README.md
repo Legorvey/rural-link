@@ -133,25 +133,27 @@ Seluruh enam anggota Kelompok 1 berpartisipasi aktif dalam presentasi akhir.
 - [Daftar Referensi & DOI](docs/REFERENCES.md)
 
 ### TIM PROGRAM — Aditya & Zahran
-- Kode sumber mesin: `src/` ([propagation.py](src/propagation.py), [link_budget.py](src/link_budget.py), [modulation.py](src/modulation.py), [channels.py](src/channels.py), [metrics.py](src/metrics.py), [adaptive.py](src/adaptive.py)), [config.py](config.py), [app.py](app.py)
+- Kode sumber mesin: `src/` ([propagation.py](src/propagation.py), [link_budget.py](src/link_budget.py), [modulation.py](src/modulation.py), [channels.py](src/channels.py), [metrics.py](src/metrics.py), [adaptive.py](src/adaptive.py)), [config.py](config.py), [api/index.py](api/index.py), [public/index.html](public/index.html), [app.py](app.py)
 - [Arsitektur Sistem](docs/ARCHITECTURE.md) dan [Panduan Developer](docs/DEVELOPER_GUIDE.md)
-- Pengujian otomatis: `tests/` ([test_environment.py](tests/test_environment.py), [test_scientific_engine.py](tests/test_scientific_engine.py), [test_adaptive.py](tests/test_adaptive.py), [test_app.py](tests/test_app.py))
-- Peluncur offline: [run_local.ps1](run_local.ps1)
-- Prototipe awal Zahran: [prototypes/dashboard_rurallink.html](prototypes/dashboard_rurallink.html) dan [prototypes/README.md](prototypes/README.md)
+- Pengujian otomatis: `tests/` ([test_environment.py](tests/test_environment.py), [test_scientific_engine.py](tests/test_scientific_engine.py), [test_adaptive.py](tests/test_adaptive.py), [test_app.py](tests/test_app.py), [test_api.py](tests/test_api.py))
+- Peluncur lokal: [run_web.ps1](run_web.ps1) (Native Web + FastAPI) dan [run_local.ps1](run_local.ps1) (Streamlit fallback)
+- Prototipe asli Zahran: [prototypes/dashboard_interaktif_siskom.html](prototypes/dashboard_interaktif_siskom.html), [prototypes/dashboard_rurallink.html](prototypes/dashboard_rurallink.html), dan [prototypes/README.md](prototypes/README.md)
 
 ---
 
 ## Dokumentasi Teknis
 
-### Menjalankan Secara Lokal (Offline Fallback, Python 3.12)
+### Menjalankan Secara Lokal (Python 3.12)
+
+Native Web + FastAPI (utama):
 
 ```powershell
-git clone https://github.com/Legorvey/rural-link.git
-cd rural-link
 uv venv --python 3.12 .venv
 uv pip install --python .venv\Scripts\python.exe -r requirements-dev.txt
-.\run_local.ps1
+.venv\Scripts\python.exe -m uvicorn api.index:app --host 127.0.0.1 --port 8000
 ```
+
+Atau gunakan `.\run_web.ps1`. Untuk cadangan Streamlit offline, jalankan `.\run_local.ps1`.
 
 ### Pengujian dan Linter
 
@@ -165,19 +167,25 @@ uv pip install --python .venv\Scripts\python.exe -r requirements-dev.txt
 
 ```text
 rural-link/
-├── app.py                 # Antarmuka Streamlit terintegrasi (memanggil src/)
+├── public/                # Frontend native HTML/CSS/JS (Canvas + UI state)
+├── api/                   # FastAPI Python serverless entrypoint (memanggil src/)
+├── vercel.json            # Konfigurasi deployment Vercel (static public/ + /api/*)
+├── app.py                 # Cadangan Streamlit (offline & backup deployment)
 ├── config.py              # Parameter default & batasan tervalidasi
-├── run_local.ps1          # Peluncur offline menggunakan .venv
-├── requirements.txt       # Dependensi runtime terpin (Streamlit Cloud)
+├── run_web.ps1            # Peluncur lokal Native Web + FastAPI
+├── run_local.ps1          # Peluncur cadangan Streamlit
+├── requirements.txt       # Dependensi runtime Vercel (FastAPI + mesin ilmiah)
+├── requirements-streamlit.txt  # Dependensi tambahan untuk cadangan Streamlit
+├── requirements-dev.txt   # Dependensi lengkap dev & pengujian
 ├── src/                   # Mesin simulasi ilmiah & optimasi adaptif
 ├── experiments/           # Skrip eksperimen deterministik
-├── tests/                 # 96 pengujian otomatis (pytest + AppTest)
+├── tests/                 # Pengujian otomatis (mesin, API FastAPI, dan AppTest)
 ├── outputs/               # summary.md, CSV hasil, dan grafik PNG
-├── prototypes/            # Prototipe HTML awal Zahran (referensi visual)
+├── prototypes/            # Arsip HTML asli karya Zahran (referensi visual)
 └── docs/                  # Dokumentasi metode, demo, hasil, dan tim
 ```
 
-**Info Deployment:** Streamlit Community Cloud memakai file utama `app.py`, Python `3.12` ([.python-version](.python-version)), dan [requirements.txt](requirements.txt). Detail lanjutan tersedia di [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) dan [docs/PROGRESS.md](docs/PROGRESS.md).
+**Info Deployment (Vercel):** Framework Preset = `Other`, Root Directory = `.`, Build Command = *(kosong)*, Output Directory = `public`, Python `3.12` ([.python-version](.python-version)), routing `/api/(.*)` -> `api/index.py` ([vercel.json](vercel.json)), dan dependensi runtime di [requirements.txt](requirements.txt). Cadangan Streamlit Community Cloud tetap tersedia melalui `app.py` dan [requirements-streamlit.txt](requirements-streamlit.txt). Detail lanjutan tersedia di [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) dan [docs/PROGRESS.md](docs/PROGRESS.md).
 
 ---
 
