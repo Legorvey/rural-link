@@ -104,3 +104,11 @@ All reference PDFs in `references/` inspected and recorded in `docs/REFERENCES.m
 - **Exports:** `adaptive_coverage_curves.csv`, `adaptive_coverage_summary.csv`, `adaptive_strategy_comparison.csv`, `adaptive_mc_validation.csv`, `outputs/summary.md`.
 - **Checks:** pytest 93 passed (incl. AppTest), ruff clean, experiments rerun.
 - **Pending:** Phase 07 deployment (not started, no merge).
+
+---
+
+## Phase 07 release preparation: COMPLETE (2026-11-26, branch feature/scientific-app)
+- **Runtime & Cloud compatibility:** Pinned Linux-compatible runtime dependencies in `requirements.txt` (`numpy==2.5.5`, `scipy==1.18.1`, `pandas==3.1.1`, `matplotlib==3.11.2`, `plotly==7.2.0`, `streamlit==1.67.0`) for Python 3.12 (`.python-version`). Verified no Windows-specific packages, local PDF dependencies, absolute Windows paths, external APIs, or secrets in runtime code.
+- **Offline launcher & docs:** Added `run_local.ps1` for offline `.venv` launch; updated `README.md` with Streamlit Community Cloud deployment settings (`feature/scientific-app`, `app.py`, Python 3.12) and live demo sequence.
+- **Artifacts:** All `outputs/` CSVs, PNGs, and `outputs/summary.md` verified tracked in Git.
+- **Checks:** `pytest` 93 passed (including AppTest), `ruff check` and `ruff format --check` clean.

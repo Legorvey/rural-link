@@ -14,9 +14,9 @@
 
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-0F172A?style=flat-square&logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.67-065F46?style=flat-square&logo=streamlit&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Phase%2003%20Validated-10B981?style=flat-square)
-![Tests](https://img.shields.io/badge/Tests-77%20Passed-0284C7?style=flat-square)
-![Deployment](https://img.shields.io/badge/Deployment-Pending-64748B?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Phase%2007%20Ready-10B981?style=flat-square)
+![Tests](https://img.shields.io/badge/Tests-93%20Passed-0284C7?style=flat-square)
+![Deployment](https://img.shields.io/badge/Deployment-Release%20Ready-0F766E?style=flat-square)
 
 *Snapshot: `2026-11-25` | Baseline commit: `88a1828` | Jadwal presentasi: `26 November 2026, 15.00 WIB`*
 
@@ -32,8 +32,8 @@
 
 - **Mengapa masalah ini penting?** Di wilayah Terdepan, Terluar, dan Tertinggal (3T) Indonesia, cakupan geografis masih tertinggal jauh dibanding cakupan populasi. Pada sel pedesaan yang luas, daya pancar perangkat pengguna (UE) jauh lebih kecil daripada BTS, sehingga arah *uplink* sering kali lebih dulu mengalami kegagalan koneksi.
 - **Apa solusi yang diusulkan?** Mengombinasikan **modulasi adaptif** (`BPSK`, `QPSK`, `16-QAM`, `64-QAM`) dan **alokasi bandwidth adaptif** berbasis *Resource Block* (`1, 2, 5, 10, 25` RB) pada frekuensi `900 MHz` dan `1800 MHz`.
-- **Apa yang sudah selesai?** Mesin simulasi ilmiah (`src/`), validasi matematis *closed-form* dan Monte Carlo *bit-level* (Fase 01–03), 77 pengujian otomatis (`pytest`), serta 4 grafik dan 3 tabel CSV terverifikasi.
-- **Apa yang masih pending?** Optimasi adaptif gabungan S0–S3 (`src/adaptive.py`, Fase 04), antarmuka web Streamlit interaktif penuh (Fase 05), audit akhir (Fase 06), dan deployment publik (Fase 07).
+- **Apa yang sudah selesai?** Mesin simulasi ilmiah (`src/`), optimasi adaptif gabungan S0–S3 + referensi R0 (`src/adaptive.py`), audit Fase 06, antarmuka web Streamlit (`app.py`), 93 pengujian otomatis (`pytest` + `AppTest`), serta grafik, CSV tervalidasi, dan ringkasan di `outputs/summary.md`.
+- **Apa yang masih pending?** Publikasi live ke Streamlit Community Cloud (menunggu otorisasi push/deploy akhir) dan presentasi.
 
 ### Jalur Baca Cepat Berdasarkan Peran
 | Peran | Dokumen Utama | Tujuan |
@@ -191,10 +191,22 @@ Ambang batas pergantian modulasi pada $\text{BER} = 10^{-2}$ di kanal AWGN ([mod
 
 ## Simulator dan Demo
 
-Saat ini `app.py` berfungsi sebagai *environment & health check* Streamlit (Fase 01). Antarmuka interaktif penuh dengan kontrol parameter dan mode cepat/riset direncanakan pada **Fase 05**.
-- **Kebutuhan perangkat keras:** Laptop/PC standar; tidak memerlukan internet setelah dependensi terpasang.
-- **Status deployment web:** *Deployment pending* (Fase 07).
-- **Rencana cadangan presentasi:** (A) Aplikasi Streamlit ter-deploy → (B) Aplikasi Streamlit lokal → (C) Grafik PNG dan tabel CSV di `outputs/`.
+`app.py` adalah *workbench* Streamlit interaktif yang mengambil seluruh metrik, kurva cakupan, dan sampel konstelasi langsung dari mesin Python (`src/`).
+- **Kebutuhan perangkat keras:** Laptop/PC standar; berjalan **100% offline** setelah dependensi terpasang (tanpa API eksternal, database, atau PDF lokal).
+- **Peluncuran offline cepat (Windows):** jalankan `.\run_local.ps1`.
+- **Deployment Streamlit Community Cloud:**
+  - **Repository:** `Legorvey/rural-link`
+  - **Branch:** `feature/scientific-app`
+  - **Main file path:** `app.py`
+  - **Python version:** `3.12` (`.python-version`)
+  - **Dependencies:** `requirements.txt` (versi Linux-compatible terpin)
+- **Urutan Demo Langsung (Live Demo Sequence):**
+  1. Buka `app.py` (default: `900 MHz`, `NLOS`, `23 dBm`, jarak `5.0 km`, semua skenario aktif).
+  2. Tunjukkan tab **Coverage zones** untuk membandingkan radius deterministik (*median PL*) vs reliabilitas stokastik (*shadowing* & *Rayleigh CSI*).
+  3. Ubah frekuensi dari `900 MHz` ke `1800 MHz` di panel kiri untuk memperlihatkan penyempitan jangkauan dan kenaikan outage pada strip telemetri.
+  4. Buka tab **Operating points** untuk melihat transisi adaptif modulasi dan *Resource Block* terhadap jarak.
+  5. Buka tab **Bit-level validation**, klik **Run Monte Carlo transmission** untuk membuktikan BER *bit-level* serta konstelasi AWGN vs Rayleigh hasil *equalization* secara langsung.
+- **Rencana cadangan presentasi:** (A) Aplikasi Streamlit ter-deploy → (B) Aplikasi Streamlit lokal (`.\run_local.ps1`) → (C) Grafik PNG, CSV, dan `outputs/summary.md`.
 
 ---
 
@@ -229,10 +241,11 @@ rural-link/
 ├── CONTRIBUTING.md            # Panduan kontribusi dan Git
 ├── CITATION.cff               # Metadata sitasi proyek
 ├── config.py                  # Konfigurasi & parameter default tervalidasi
-├── app.py                     # Entrypoint Streamlit (saat ini: health check)
-├── src/                       # Mesin simulasi ilmiah (Fase 03; adaptive.py pending)
-├── experiments/               # Skrip eksperimen deterministik (run_experiments.py)
-├── tests/                     # 77 pengujian otomatis (unit & integrasi ilmiah)
+├── app.py                     # Workbench Streamlit interaktif (terhubung ke src/)
+├── run_local.ps1              # Skrip peluncuran offline lokal (.venv)
+├── src/                       # Mesin simulasi ilmiah + optimasi adaptif (adaptive.py)
+├── experiments/               # Skrip eksperimen deterministik (run_experiments.py, run_adaptive.py)
+├── tests/                     # 93 pengujian otomatis (unit, ilmiah, & Streamlit AppTest)
 ├── outputs/                   # Grafik PNG & tabel CSV tervalidasi
 ├── references/                # PDF referensi lokal (di-gitignore, tidak di-commit)
 └── docs/                      # Dokumentasi lengkap tim, metode, dan handoff
