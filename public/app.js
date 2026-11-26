@@ -29,7 +29,7 @@
   };
 
   const SNR_W = 660;
-  const SNR_H = 310;
+  const SNR_H = 375;
   const SNR_PAD = { l: 52, r: 22, t: 18, b: 40 };
   const PREVIEW_MAX_BITS = 10000;
 
@@ -155,8 +155,8 @@
     document.getElementById("lblEnv").textContent = state.env;
     document.getElementById("hintEnv").textContent =
       state.env === "LOS"
-        ? "Park (2023): n = 2,16 · σ = 3,07 dB."
-        : "Park (2023): n = 2,56 · σ = 11,40 dB.";
+        ? "n = 2,16 · σ = 3,07 dB"
+        : "n = 2,56 · σ = 11,40 dB";
     document.getElementById("lblShadow").textContent =
       state.shadow === "median" ? "Median" : "Margin 95%";
     document.getElementById("lblChannel").textContent =
@@ -165,9 +165,7 @@
     document.getElementById("lblPt").textContent = `${state.tx_power_dbm} dBm`;
     document.getElementById("lblTargetBer").textContent =
       state.ber_target === 0.001 ? "10⁻³" : "10⁻²";
-    document.getElementById("hintStrat").textContent = manual
-      ? "Mode manual: RB dan modulasi dikunci."
-      : "Mode adaptif: optimizer memilih modulasi & RB.";
+    document.getElementById("hintStrat").hidden = !manual;
     document.getElementById("lblRbManual").textContent = `${state.rb_manual} RB`;
     document.getElementById("lblModManual").textContent = state.mod_manual;
     document.getElementById("lblMcBits").textContent = MC_BIT_LABELS[state.n_bits] || `${state.n_bits}`;
@@ -306,12 +304,11 @@
       document.getElementById(`cmpMod${f}`).textContent = a.ok ? `${a.mod} (${a.rb})` : "Outage";
     });
 
-    document.getElementById("snrChartTitle").textContent =
-      `Kurva SNR vs Jarak (${state.env} · THEORETICAL)`;
-    document.getElementById("freqTableTitle").textContent =
-      `Perbandingan Frekuensi (${fmtIdNum(state.dist_km, 2)} km · ${state.env})`;
-    document.getElementById("stratTableTitle").textContent =
-      `Perbandingan Strategi (${fmtIdNum(state.dist_km, 2)} km · ${state.freq_mhz} MHz ${state.env})`;
+    document.getElementById("snrChartMeta").textContent = `${state.env} · THEORETICAL`;
+    document.getElementById("freqTableMeta").textContent =
+      `${fmtIdNum(state.dist_km, 2)} km · ${state.env} · S3`;
+    document.getElementById("stratTableMeta").textContent =
+      `${fmtIdNum(state.dist_km, 2)} km · ${state.freq_mhz} MHz ${state.env} · SIMULATED`;
 
     drawSnrChart(data);
     renderFreqComparisonTable(data, lastZonesData);
@@ -639,7 +636,7 @@
   }
 
   function drawConstellations() {
-    const { ctx, W, H } = setupCanvas("cvConst", 600, 275);
+    const { ctx, W, H } = setupCanvas("cvConst", 600, 255);
     const chKey = state.channel === "AWGN" ? "awgn" : "rayleigh";
 
     if (mcStatusMode === "outage") {
@@ -1717,8 +1714,8 @@
     const cap = document.getElementById("mapCaption");
     if (cap) {
       cap.textContent = state.show_reliability
-        ? "Zona warna: median PL · Putus navy: batas 95% shadowing · Titik amber: batas 95% (+Rayleigh CSI) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block."
-        : "Zona warna: median PL (1–12 km) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block.";
+        ? "Median PL · Putus navy: 95% shadowing · Titik amber: 95% (+Rayleigh CSI) · S3 dapat menghasilkan zona berulang karena perubahan RB."
+        : "Median PL (THEORETICAL, 1–12 km) · S3 dapat menghasilkan zona berulang karena perubahan RB.";
     }
     if (lastZonesData) drawCoverageMap(lastZonesData);
   });

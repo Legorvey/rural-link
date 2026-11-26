@@ -463,8 +463,8 @@ canvas {
   border-radius: 4px;
 }
 
-#cvSnr { aspect-ratio: 660 / 310; }
-#cvConst { aspect-ratio: 600 / 275; }
+#cvSnr { aspect-ratio: 660 / 375; }
+#cvConst { aspect-ratio: 600 / 255; }
 #cvMap { aspect-ratio: 1180 / 295; }
 
 .map-controls {

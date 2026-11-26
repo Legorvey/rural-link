@@ -279,7 +279,7 @@ def test_native_web_ui_cleanup_contract():
     assert 'id="mcPairSummary"' not in html
     assert 'id="chkShowReliability"' in html
     assert 'id="chkLiveMc" checked' in html
-    assert "perubahan jumlah Resource Block" in html
+    assert "perubahan RB" in html
     for tab_id in ("panelWorkbench", "panelResults", "panelMethodology", "panelEncyclopedia"):
         assert f'id="{tab_id}"' in html
 

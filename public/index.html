@@ -43,12 +43,9 @@
       <div class="workbench">
         <aside class="panel controls-rail" aria-label="Panel Parameter Simulasi">
           <div class="control-group">
-            <button type="button" class="btn-secondary" id="btnPreset">
+            <button type="button" class="btn-secondary" id="btnPreset" title="900 MHz NLOS, 5 km, 23 dBm, S3, BER 10⁻² (S0 outage)">
               Preset: pemulihan tepi sel
             </button>
-            <p class="control-hint">
-              900 MHz NLOS, 5 km, 23 dBm, S3 (baseline S0 outage).
-            </p>
           </div>
 
           <div class="control-group">
@@ -62,7 +59,7 @@
               <button type="button" class="seg-btn" data-freq="1800" aria-pressed="false">1800 MHz</button>
             </div>
             <p class="control-hint">
-              Utama: 900/1800 MHz · Suplemen: 700 MHz (eksploratori).
+              Utama: 900/1800 MHz · Eksploratori: 700 MHz
             </p>
           </div>
 
@@ -75,7 +72,7 @@
               <button type="button" class="seg-btn" data-env="LOS" aria-pressed="false">LOS (n=2,16)</button>
               <button type="button" class="seg-btn active" data-env="NLOS" aria-pressed="true">NLOS (n=2,56)</button>
             </div>
-            <p class="control-hint" id="hintEnv">Park (2023): n = 2,56 · σ = 11,40 dB.</p>
+            <p class="control-hint" id="hintEnv">n = 2,56 · σ = 11,40 dB</p>
           </div>
 
           <div class="control-group">
@@ -139,7 +136,7 @@
               <option value="R0">R0: Fixed BPSK, 1 RB (robust reference)</option>
               <option value="MANUAL">Manual: RB dan modulasi dikunci pengguna</option>
             </select>
-            <p class="control-hint" id="hintStrat">Mode adaptif: optimizer memilih modulasi dan RB.</p>
+            <p class="control-hint" id="hintStrat" hidden>RB dan modulasi dikunci pengguna.</p>
           </div>
 
           <div class="control-group">
@@ -181,20 +178,17 @@
               <button type="button" class="seg-btn active" data-nbits="100000" aria-pressed="true">10⁵</button>
               <button type="button" class="seg-btn" data-nbits="1000000" aria-pressed="false">10⁶</button>
             </div>
-            <label class="toggle-row" for="chkLiveMc">
+            <label class="toggle-row" for="chkLiveMc" title="Otomatis hitung ulang Monte Carlo saat parameter stabil">
               <span>Simulasi Langsung (Live)</span>
               <input type="checkbox" id="chkLiveMc" checked />
             </label>
-            <p class="control-hint">
-              Otomatis hitung ulang saat parameter stabil.
-            </p>
             <p class="notice-bar warn" id="mcSmallSampleWarn" hidden>
               Sampel kecil memiliki ketidakpastian statistik tinggi (CI lebar).
             </p>
           </div>
 
           <div class="control-group">
-            <div class="control-label"><span>Ringkasan 700 / 900 / 1800 MHz (pada d)</span></div>
+            <div class="control-label"><span>Ringkasan 700 / 900 / 1800 MHz</span></div>
             <div class="table-scroll">
               <table class="compare-table" aria-label="Tabel Ringkas 700, 900, dan 1800 MHz">
                 <thead>
@@ -279,15 +273,17 @@
           <div class="charts-grid">
             <article class="panel chart-panel">
               <div class="chart-head">
-                <h2 id="snrChartTitle">Kurva SNR vs Jarak (THEORETICAL)</h2>
+                <h2 id="snrChartTitle">SNR terhadap Jarak</h2>
+                <span class="chart-note" id="snrChartMeta">NLOS · THEORETICAL</span>
               </div>
-              <span class="chart-note">Garis penuh: 1 RB · Putus: 25 RB · Titik kuning: geser jarak (1–12 km)</span>
-              <canvas id="cvSnr" width="660" height="310" aria-label="Grafik interaktif SNR terhadap jarak; geser titik aktif untuk mengubah jarak"></canvas>
+              <span class="chart-note">1 RB (penuh) · 25 RB (putus) · Seret titik kuning (1–12 km)</span>
+              <canvas id="cvSnr" width="660" height="375" aria-label="Grafik interaktif SNR terhadap jarak; geser titik aktif untuk mengubah jarak"></canvas>
             </article>
 
             <article class="panel chart-panel">
               <div class="chart-head">
-                <h2>Monte Carlo &amp; Konstelasi (SIMULATED)</h2>
+                <h2>Monte Carlo &amp; Konstelasi</h2>
+                <span class="chart-note">SIMULATED</span>
               </div>
               <div class="mc-toolbar">
                 <button type="button" class="btn-primary" id="btnRunMc">Jalankan Monte Carlo</button>
@@ -299,13 +295,13 @@
               <div class="mc-stats" id="mcStatsBox">
                 <div class="mc-stats-muted">Menyiapkan simulasi Monte Carlo...</div>
               </div>
-              <canvas id="cvConst" width="600" height="275"></canvas>
+              <canvas id="cvConst" width="600" height="255"></canvas>
             </article>
           </div>
 
           <article class="panel chart-panel">
             <div class="chart-head">
-              <h2>Peta Zona Modulasi Radial (1–12 km)</h2>
+              <h2>Peta Zona Modulasi</h2>
               <div class="map-controls">
                 <label for="selZoneStrat" class="map-ctl-label">Strategi:</label>
                 <select id="selZoneStrat" class="map-select">
@@ -330,14 +326,14 @@
             </div>
             <canvas id="cvMap" width="1180" height="295"></canvas>
             <p class="control-hint" id="mapCaption">
-              Zona warna: median PL (1–12 km) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block.
+              Median PL (THEORETICAL, 1–12 km) · S3 dapat menghasilkan zona berulang karena perubahan RB.
             </p>
           </article>
 
           <article class="panel chart-panel">
             <div class="chart-head">
-              <h2 id="stratTableTitle">Perbandingan Strategi (5,00 km · 900 MHz NLOS)</h2>
-              <span class="chart-note">5.000 realisasi (seed 42)</span>
+              <h2 id="stratTableTitle">Perbandingan Strategi</h2>
+              <span class="chart-note" id="stratTableMeta">5,00 km · 900 MHz NLOS · SIMULATED</span>
             </div>
             <div class="table-scroll">
               <table class="data-table compact-table" id="tblStrategyCmp">
@@ -361,8 +357,8 @@
 
           <article class="panel chart-panel">
             <div class="chart-head">
-              <h2 id="freqTableTitle">Perbandingan Frekuensi (5,00 km · NLOS)</h2>
-              <span class="chart-note">Seed 42 · Strategi S3</span>
+              <h2 id="freqTableTitle">Perbandingan Frekuensi</h2>
+              <span class="chart-note" id="freqTableMeta">5,00 km · NLOS · S3</span>
             </div>
             <div class="table-scroll">
               <table class="data-table compact-table" id="tblFreqCmp">
