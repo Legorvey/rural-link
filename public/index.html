@@ -245,10 +245,9 @@
         </aside>
 
         <div class="main-stage">
-          <div class="notice-bar warn" id="exploratoryBanner" hidden></div>
-          <div class="notice-bar error" id="apiErrorBanner" hidden role="alert"></div>
-          <div class="notice-bar info" id="apiLoadingBanner" hidden>Memuat perhitungan mesin Python...</div>
-          <div class="notice-bar warn" id="outageBanner" hidden></div>
+          <div class="notice-bar status-slot" id="workbenchStatusBar" role="status" aria-live="polite">
+            Status link: memuat konfigurasi awal...
+          </div>
 
           <div class="telemetry-strip" aria-label="Telemetry Link Uplink">
             <div class="telemetry-cell">
@@ -297,7 +296,7 @@
             <article class="panel chart-panel">
               <div class="chart-head">
                 <h2 id="snrChartTitle">Kurva SNR terhadap Jarak (700 / 900 / 1800 MHz, THEORETICAL)</h2>
-                <span class="status-pill" id="snrUpdateStatus">Siap · Seret titik atau klik grafik</span>
+                <span class="status-pill" id="snrUpdateStatus">Siap · Seret titik</span>
               </div>
               <span class="chart-note">Garis penuh: 1 RB · Putus pendek: 25 RB · Garis horizontal: ambang Es/N0 Cho &amp; Yoon · Titik kuning: geser jarak (1–12 km)</span>
               <canvas id="cvSnr" width="660" height="310" aria-label="Grafik interaktif SNR terhadap jarak; geser titik aktif untuk mengubah jarak"></canvas>
@@ -316,8 +315,7 @@
                   <button type="button" class="seg-btn" data-mcview="by_freq" aria-pressed="false">Antar Frekuensi</button>
                 </div>
               </div>
-              <div class="notice-bar info" id="mcStateNotice" hidden></div>
-              <div class="mc-stats" id="mcStatsBox" hidden></div>
+              <div class="mc-stats" id="mcStatsBox">Menyiapkan simulasi Monte Carlo bit-level...</div>
               <canvas id="cvConst" width="600" height="275"></canvas>
             </article>
           </div>

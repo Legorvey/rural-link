@@ -54,9 +54,12 @@
   let lastOpData = null;
   let lastZonesData = null; // distance-independent radial zones + S3 radius summary
   let lastStochDistData = null; // distance-dependent outage + strategy table
-  let mcResult = null;
-  let mcResultKey = null;
-  let mcStatusMode = "idle"; // idle | loading | ready | stale | error | outage
+  let lastValidMcResult = null;
+  let lastValidMcKey = null;
+  let lastValidMcMeta = null;
+  let mcStatusMode = "idle"; // idle | updating | ready | stale | error | outage
+  let mcLastError = "";
+  let workbenchApiError = "";
 
   let resultsData = null;
   let resultsEnv = "NLOS";
@@ -171,14 +174,7 @@
     document.getElementById("lblModManual").textContent = state.mod_manual;
     document.getElementById("lblMcBits").textContent = MC_BIT_LABELS[state.n_bits] || `${state.n_bits}`;
     document.getElementById("mcSmallSampleWarn").hidden = state.n_bits >= 100000;
-
-    const expBanner = document.getElementById("exploratoryBanner");
-    if (state.freq_mhz === 700 || state.ber_target !== 0.01) {
-      expBanner.hidden = false;
-      expBanner.textContent = `Catatan suplemen: konfigurasi aktif (${state.freq_mhz} MHz, BER ${state.ber_target}) termasuk analisis sensitivitas tambahan di luar riset utama 900/1800 MHz pada BER 1e-2 (Tab Hasil Penelitian tetap).`;
-    } else {
-      expBanner.hidden = true;
-    }
+    updateWorkbenchStatusBar();
   }
 
   function setupCanvas(id, logicalW, logicalH) {
@@ -196,14 +192,51 @@
     return { ctx, W: logicalW, H: logicalH };
   }
 
+  function updateWorkbenchStatusBar() {
+    const bar = document.getElementById("workbenchStatusBar");
+    if (!bar) return;
+
+    if (workbenchApiError) {
+      bar.className = "notice-bar error status-slot";
+      bar.textContent = workbenchApiError;
+      return;
+    }
+
+    const act = lastOpData && lastOpData.active;
+    if (act && !act.ok) {
+      if (state.strategy === "MANUAL" && act.mod !== "Outage") {
+        bar.className = "notice-bar warn status-slot";
+        bar.textContent = `Outage manual: Eb/N0 ${fmtIdNum(act.ebn0_db, 1)} dB < ambang ${fmtIdNum(act.ebn0_threshold_db, 2)} dB (${act.mod}, BER ${state.ber_target}).`;
+      } else {
+        bar.className = "notice-bar error status-slot";
+        bar.textContent = `Outage pada ${fmtIdNum(state.dist_km, 2)} km (${state.freq_mhz} MHz ${state.env}): tidak ada kombinasi modulasi dan RB yang memenuhi BER ${state.ber_target}.`;
+      }
+      return;
+    }
+
+    if (state.freq_mhz === 700 || state.ber_target !== 0.01) {
+      bar.className = "notice-bar warn status-slot";
+      bar.textContent = `Suplemen sensitivitas (${state.freq_mhz} MHz, BER ${state.ber_target}) di luar riset utama 900/1800 MHz BER 1e-2 (Tab Hasil Penelitian tetap).`;
+      return;
+    }
+
+    bar.className = "notice-bar status-slot";
+    if (act) {
+      bar.textContent = `Status link: Aktif · ${act.mod} × ${act.rb} RB (${state.freq_mhz} MHz ${state.env}, ${fmtIdNum(state.dist_km, 2)} km).`;
+    } else {
+      bar.textContent = "Status link: memuat konfigurasi awal...";
+    }
+  }
+
   function showWorkbenchError(msg) {
-    const el = document.getElementById("apiErrorBanner");
-    el.textContent = msg;
-    el.hidden = false;
+    workbenchApiError = msg;
+    updateWorkbenchStatusBar();
   }
 
   function clearWorkbenchError() {
-    document.getElementById("apiErrorBanner").hidden = true;
+    if (!workbenchApiError) return;
+    workbenchApiError = "";
+    updateWorkbenchStatusBar();
   }
 
   async function fetchJson(url, options) {
@@ -291,19 +324,7 @@
       ? "tanpa transmisi"
       : `Shannon ${fmtIdNum(act.shannon_mbps, 2)} Mbit/s`;
 
-    const outBanner = document.getElementById("outageBanner");
-    if (state.strategy === "MANUAL" && !act.ok && act.mod !== "Outage") {
-      outBanner.hidden = false;
-      outBanner.className = "notice-bar warn";
-      outBanner.textContent = `Konfigurasi manual tidak layak: Eb/N0 ${fmtIdNum(act.ebn0_db, 1)} dB lebih rendah dari ambang ${fmtIdNum(act.ebn0_threshold_db, 2)} dB untuk ${act.mod} (BER ${state.ber_target}). Link dinyatakan outage.`;
-    } else if (inOutage) {
-      outBanner.hidden = false;
-      outBanner.className = "notice-bar error";
-      outBanner.textContent =
-        "Tidak ada kombinasi modulasi dan RB yang memenuhi BER target pada jarak ini. Kurangi jarak atau naikkan daya pancar UE.";
-    } else {
-      outBanner.hidden = true;
-    }
+    updateWorkbenchStatusBar();
 
     const base = data.baseline_s0;
     document.getElementById("mcPairSummary").textContent =
@@ -583,39 +604,45 @@
   function drawConstellations() {
     const { ctx, W, H } = setupCanvas("cvConst", 600, 275);
     const chKey = state.channel === "AWGN" ? "awgn" : "rayleigh";
-    const hasExactOrPreview =
-      mcResult &&
-      mcResultKey === currentMcParamKey() &&
-      mcStatusMode === "ready";
 
-    if (!hasExactOrPreview) {
+    if (mcStatusMode === "outage") {
+      ctx.fillStyle = "#9A1B1B";
+      ctx.font = "600 13px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Konfigurasi aktif dalam keadaan outage (tidak ada transmisi).", W / 2, H / 2);
+      return;
+    }
+
+    if (!lastValidMcResult) {
       ctx.fillStyle = "#475569";
       ctx.font = "13px sans-serif";
       ctx.textAlign = "center";
-      let msg = "Tekan 'Jalankan Monte Carlo' untuk menampilkan sampel I/Q nyata.";
-      if (mcStatusMode === "outage") {
-        msg = "Konfigurasi aktif dalam keadaan outage (tidak ada transmisi).";
-      } else if (mcStatusMode === "loading") {
-        msg = "Menjalankan simulasi Monte Carlo bit-level di mesin Python...";
-      } else if (mcStatusMode === "error") {
-        msg = "Simulasi Monte Carlo gagal; tidak ada data ditampilkan.";
-      }
+      const msg =
+        mcStatusMode === "error"
+          ? "Simulasi Monte Carlo gagal; tidak ada data ditampilkan."
+          : "Menyiapkan sampel I/Q nyata dari mesin Python...";
       ctx.fillText(msg, W / 2, H / 2);
       return;
     }
 
+    const isCurrent =
+      mcStatusMode === "ready" && lastValidMcKey === currentMcParamKey();
+
     let panels = [];
     if (state.mc_view === "opt_vs_s0") {
       panels = [
-        { title: `Dioptimalkan: ${mcResult.opt.modulation}`, res: mcResult.opt },
+        { title: `Dioptimalkan: ${lastValidMcResult.opt.modulation}`, res: lastValidMcResult.opt },
         {
-          title: `Baseline S0: ${mcResult.base ? mcResult.base.modulation : "Outage"}`,
-          res: mcResult.base,
+          title: `Baseline S0: ${lastValidMcResult.base ? lastValidMcResult.base.modulation : "Outage"}`,
+          res: lastValidMcResult.base,
         },
       ];
     } else {
       panels = [700, 900, 1800].map((f) => {
-        const r = mcResult.by_freq && mcResult.by_freq[String(f)] ? mcResult.by_freq[String(f)] : null;
+        const r =
+          lastValidMcResult.by_freq && lastValidMcResult.by_freq[String(f)]
+            ? lastValidMcResult.by_freq[String(f)]
+            : null;
         return { title: `${f} MHz: ${r ? r.modulation : "Outage"}`, res: r };
       });
     }
@@ -638,7 +665,7 @@
       ctx.lineTo(cx, H - 14);
       ctx.stroke();
 
-      ctx.fillStyle = "#0F2A47";
+      ctx.fillStyle = isCurrent ? "#0F2A47" : "#475569";
       ctx.font = "bold 11.5px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(p.title, cx, 18);
@@ -654,7 +681,7 @@
 
       const smp = p.res[`samples_${chKey}`];
       ctx.fillStyle = "#B45309";
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = isCurrent ? 0.6 : 0.36;
       for (let i = 0; i < smp.i.length; i += 1) {
         const px = cx + smp.i[i] * scale;
         const py = cy - smp.q[i] * scale;
@@ -665,7 +692,7 @@
       ctx.globalAlpha = 1.0;
 
       const ideal = p.res.ideal_constellation;
-      ctx.strokeStyle = "#0F2A47";
+      ctx.strokeStyle = isCurrent ? "#0F2A47" : "#475569";
       ctx.lineWidth = 1.6;
       for (let i = 0; i < ideal.i.length; i += 1) {
         const ix = cx + ideal.i[i] * scale;
@@ -678,6 +705,29 @@
         ctx.stroke();
       }
     });
+
+    if (!isCurrent) {
+      const tagText =
+        mcStatusMode === "updating"
+          ? "Sebelumnya · memperbarui"
+          : mcStatusMode === "error"
+            ? "Sebelumnya · gagal"
+            : "Sebelumnya";
+      ctx.font = "600 10.5px sans-serif";
+      const tw = ctx.measureText(tagText).width + 14;
+      const bx = W - tw - 8;
+      const by = H - 24;
+      ctx.fillStyle = "rgba(255, 251, 235, 0.94)";
+      ctx.strokeStyle = "#F59E0B";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, tw, 18, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#B45309";
+      ctx.textAlign = "center";
+      ctx.fillText(tagText, bx + tw / 2, by + 12.5);
+    }
   }
 
   function drawCoverageMap(zoneData) {
@@ -760,76 +810,10 @@
     });
   }
 
-  function renderMcStats() {
-    const notice = document.getElementById("mcStateNotice");
-    const statsBox = document.getElementById("mcStatsBox");
-    const chKey = state.channel === "AWGN" ? "awgn" : "rayleigh";
-
-    const clearStatsBox = () => {
-      statsBox.hidden = true;
-      statsBox.innerHTML = "";
-    };
-
-    if (mcStatusMode === "outage") {
-      clearStatsBox();
-      notice.hidden = false;
-      notice.className = "notice-bar info";
-      notice.textContent = "Tidak ada transmisi yang dapat disimulasikan pada konfigurasi outage.";
-      setStatusPill("mcStatusPill", "Outage", false);
-      drawConstellations();
-      return;
-    }
-
-    if (mcStatusMode === "loading") {
-      clearStatsBox();
-      notice.hidden = false;
-      notice.className = "notice-bar info";
-      notice.textContent = "Memperbarui simulasi Monte Carlo bit-level...";
-      setStatusPill("mcStatusPill", "Menghitung...", true);
-      drawConstellations();
-      return;
-    }
-
-    if (mcStatusMode === "error") {
-      clearStatsBox();
-      notice.hidden = false;
-      notice.className = "notice-bar error";
-      notice.textContent = "Simulasi Monte Carlo gagal; silakan jalankan ulang.";
-      setStatusPill("mcStatusPill", "Gagal", false);
-      drawConstellations();
-      return;
-    }
-
-    if (!mcResult || mcResultKey !== currentMcParamKey() || mcStatusMode === "stale") {
-      clearStatsBox();
-      notice.hidden = false;
-      notice.className = state.live_mc ? "notice-bar info" : "notice-bar warn";
-      notice.textContent = state.live_mc
-        ? `Menunggu sinkronisasi untuk ${state.n_bits.toLocaleString("id-ID")} bit...`
-        : "Parameter berubah sejak simulasi terakhir (Live nonaktif). Tekan Jalankan Monte Carlo untuk menghitung hasil baru.";
-      setStatusPill("mcStatusPill", state.live_mc ? "Menunggu..." : "Perlu hitung ulang", false);
-      drawConstellations();
-      return;
-    }
-
-    notice.hidden = true;
-    statsBox.hidden = false;
-    const isPreview = Boolean(mcResult.is_preview);
-    setStatusPill(
-      "mcStatusPill",
-      isPreview
-        ? `Pratinjau ${mcResult.opt.n_bits.toLocaleString("id-ID")} bit`
-        : `Selesai · ${mcResult.opt.n_bits.toLocaleString("id-ID")} bit`,
-      false
-    );
-
-    const previewLine = isPreview
-      ? `<div style="color:#B45309; font-weight:600;">Pratinjau cepat saat interaksi (${mcResult.opt.n_bits.toLocaleString("id-ID")} dari target ${state.n_bits.toLocaleString("id-ID")} bit); simulasi penuh berjalan otomatis setelah berhenti.</div>`
-      : "";
-
-    const lines = [
-      ["Dioptimalkan", mcResult.opt],
-      ["Baseline S0", mcResult.base],
+  function formatMcResultLines(resObj, chKey) {
+    return [
+      ["Dioptimalkan", resObj.opt],
+      ["Baseline S0", resObj.base],
     ].map(([name, res]) => {
       if (!res) return `<div><strong>${name}:</strong> outage, tidak ada transmisi.</div>`;
       const err = res[`mc_errors_${chKey}`];
@@ -841,14 +825,76 @@
           : `, CI 95% [${ciL.toExponential(1)}, ${ciH.toExponential(1)}]`;
       return `<div><strong>${name}</strong> (${res.modulation}, Eb/N0 ${fmtIdNum(res.ebn0_db, 2)} dB, ${res.n_bits.toLocaleString("id-ID")} bit / ${res.n_symbols.toLocaleString("id-ID")} simbol, sampel konstelasi ${res[`n_samples_${chKey}`]}): BER MC AWGN ${res.mc_ber_awgn.toExponential(2)} (teori ${res.theory_ber_awgn.toExponential(2)}); Rayleigh tanpa CSI (non-adaptif) ${res.mc_ber_rayleigh.toExponential(2)} (teori ${res.theory_ber_rayleigh.toExponential(2)})${ciTxt}.</div>`;
     });
-    statsBox.innerHTML = previewLine + lines.join("");
+  }
+
+  function renderMcStats() {
+    const statsBox = document.getElementById("mcStatsBox");
+    const chKey = state.channel === "AWGN" ? "awgn" : "rayleigh";
+
+    if (mcStatusMode === "outage") {
+      statsBox.innerHTML = `<div class="mc-stats-muted">Tidak ada transmisi yang dapat disimulasikan pada konfigurasi outage.</div>`;
+      setStatusPill("mcStatusPill", "Outage", false);
+      drawConstellations();
+      return;
+    }
+
+    const isCurrent =
+      mcStatusMode === "ready" &&
+      lastValidMcResult &&
+      lastValidMcKey === currentMcParamKey();
+
+    if (isCurrent) {
+      const isPreview = Boolean(lastValidMcResult.is_preview);
+      setStatusPill(
+        "mcStatusPill",
+        isPreview
+          ? `Pratinjau ${lastValidMcResult.opt.n_bits.toLocaleString("id-ID")} bit`
+          : `Selesai · ${lastValidMcResult.opt.n_bits.toLocaleString("id-ID")} bit`,
+        false
+      );
+      const previewLine = isPreview
+        ? `<div class="mc-stats-meta">Pratinjau cepat (${lastValidMcResult.opt.n_bits.toLocaleString("id-ID")} dari target ${state.n_bits.toLocaleString("id-ID")} bit); simulasi penuh menyusul otomatis.</div>`
+        : "";
+      statsBox.innerHTML = previewLine + formatMcResultLines(lastValidMcResult, chKey).join("");
+      drawConstellations();
+      return;
+    }
+
+    if (mcStatusMode === "updating") {
+      setStatusPill("mcStatusPill", "Memperbarui...", true);
+    } else if (mcStatusMode === "error") {
+      setStatusPill("mcStatusPill", "Gagal", false);
+    } else if (mcStatusMode === "stale") {
+      setStatusPill(
+        "mcStatusPill",
+        state.live_mc ? "Menunggu sinkron..." : "Perlu hitung ulang",
+        false
+      );
+    } else {
+      setStatusPill("mcStatusPill", "Siap", false);
+    }
+
+    if (lastValidMcResult && lastValidMcMeta) {
+      const prevDesc = `${fmtIdNum(lastValidMcMeta.dist_km, 2)} km, ${lastValidMcMeta.freq_mhz} MHz, ${lastValidMcMeta.n_bits.toLocaleString("id-ID")} bit`;
+      const reason =
+        mcStatusMode === "updating"
+          ? "memperbarui..."
+          : mcStatusMode === "error"
+            ? `gagal memperbarui (${mcLastError || "error"})`
+            : "parameter berubah (Live nonaktif)";
+      const header = `<div class="mc-stats-meta">Hasil sebelumnya (${prevDesc}) — ${reason}</div>`;
+      statsBox.innerHTML = header + formatMcResultLines(lastValidMcResult, chKey).join("");
+    } else if (mcStatusMode === "error") {
+      statsBox.innerHTML = `<div style="color:#9A1B1B; font-weight:600;">Simulasi Monte Carlo gagal: ${mcLastError || "silakan jalankan ulang."}</div>`;
+    } else {
+      statsBox.innerHTML = `<div class="mc-stats-muted">Menyiapkan simulasi Monte Carlo bit-level...</div>`;
+    }
     drawConstellations();
   }
 
   function invalidateMcView() {
-    if (mcResult && mcResultKey !== currentMcParamKey()) {
-      mcResult = null;
-      mcStatusMode = "stale";
+    if (lastValidMcResult && lastValidMcKey !== currentMcParamKey()) {
+      mcStatusMode = state.live_mc ? "updating" : "stale";
       renderMcStats();
     }
   }
@@ -871,7 +917,7 @@
       ++opSeq;
       if (opController) opController.abort();
       clearWorkbenchError();
-      setStatusPill("snrUpdateStatus", "Siap · Seret titik atau klik grafik", false);
+      setStatusPill("snrUpdateStatus", "Siap · Seret titik", false);
       renderOperatingPoint(opCache.get(key));
       return opCache.get(key);
     }
@@ -879,7 +925,7 @@
     const seq = ++opSeq;
     if (opController) opController.abort();
     opController = new AbortController();
-    setStatusPill("snrUpdateStatus", "Memperbarui kurva...", true);
+    setStatusPill("snrUpdateStatus", "Memperbarui...", true);
 
     try {
       const data = await fetchJson("/api/operating-point", {
@@ -891,7 +937,7 @@
       if (seq !== opSeq) return null;
       opCache.set(key, data);
       clearWorkbenchError();
-      setStatusPill("snrUpdateStatus", "Siap · Seret titik atau klik grafik", false);
+      setStatusPill("snrUpdateStatus", "Siap · Seret titik", false);
       renderOperatingPoint(data);
       return data;
     } catch (err) {
@@ -954,8 +1000,6 @@
 
   async function executeMonteCarlo(isPreview) {
     if (lastOpData && !lastOpData.active.ok) {
-      mcResult = null;
-      mcResultKey = null;
       mcStatusMode = "outage";
       renderMcStats();
       return;
@@ -967,8 +1011,17 @@
     const cacheKey = JSON.stringify({ paramKey, mode, reqBits, isPreview });
 
     if (mcCache.has(cacheKey)) {
-      mcResult = mcCache.get(cacheKey);
-      mcResultKey = paramKey;
+      const cached = mcCache.get(cacheKey);
+      lastValidMcResult = cached;
+      lastValidMcKey = paramKey;
+      lastValidMcMeta = {
+        dist_km: state.dist_km,
+        freq_mhz: state.freq_mhz,
+        env: state.env,
+        n_bits: cached.opt.n_bits,
+        is_preview: Boolean(cached.is_preview),
+      };
+      mcLastError = "";
       mcStatusMode = "ready";
       renderMcStats();
       return;
@@ -978,8 +1031,8 @@
     if (mcController) mcController.abort();
     mcController = new AbortController();
     mcInFlight = true;
-    mcResult = null;
-    mcStatusMode = "loading";
+    mcLastError = "";
+    mcStatusMode = "updating";
     renderMcStats();
 
     try {
@@ -1005,13 +1058,20 @@
       });
       if (seq !== mcSeq) return;
       mcCache.set(cacheKey, data);
-      mcResult = data;
-      mcResultKey = paramKey;
+      lastValidMcResult = data;
+      lastValidMcKey = paramKey;
+      lastValidMcMeta = {
+        dist_km: state.dist_km,
+        freq_mhz: state.freq_mhz,
+        env: state.env,
+        n_bits: data.opt.n_bits,
+        is_preview: Boolean(data.is_preview),
+      };
       mcStatusMode = "ready";
       renderMcStats();
     } catch (err) {
       if (err.name === "AbortError" || seq !== mcSeq) return;
-      mcResult = null;
+      mcLastError = err.message || "Error";
       if (String(err.message).includes("outage")) {
         mcStatusMode = "outage";
       } else {
@@ -1074,6 +1134,12 @@
         const op = await refreshOperatingPoint();
         if (seq !== workbenchSeq || !op) return;
         refreshStochastic();
+        if (!op.active.ok) {
+          mcStatusMode = "outage";
+          renderMcStats();
+        } else if (mcStatusMode === "outage") {
+          scheduleLiveMc(true);
+        }
       }, 65);
       scheduleLiveMc(true);
       return;
@@ -1084,7 +1150,6 @@
     if (seq !== workbenchSeq || !op) return;
     refreshStochastic();
     if (!op.active.ok) {
-      mcResult = null;
       mcStatusMode = "outage";
       renderMcStats();
     } else {
@@ -1516,7 +1581,7 @@
     btn.addEventListener("click", () => {
       state.channel = btn.dataset.channel;
       syncControlsFromState();
-      if (mcResult && mcResultKey === currentMcParamKey() && mcStatusMode === "ready") {
+      if (lastValidMcResult && lastValidMcKey === currentMcParamKey() && mcStatusMode === "ready") {
         if (lastStochDistData) {
           renderStochastic(
             {
@@ -1567,7 +1632,7 @@
     btn.addEventListener("click", () => {
       state.mc_view = btn.dataset.mcview;
       setActiveSegment("data-mcview", state.mc_view);
-      if (state.mc_view === "by_freq" && mcResult && (!mcResult.by_freq || !Object.keys(mcResult.by_freq).length)) {
+      if (state.mc_view === "by_freq" && lastValidMcResult && (!lastValidMcResult.by_freq || !Object.keys(lastValidMcResult.by_freq).length)) {
         if (state.live_mc) {
           executeMonteCarlo(false);
           return;
@@ -1619,8 +1684,6 @@
   document.getElementById("btnPreset").addEventListener("click", () => {
     const keepLive = state.live_mc;
     Object.assign(state, DEFAULTS, { live_mc: keepLive });
-    mcResult = null;
-    mcResultKey = null;
     refreshAllWorkbench("discrete");
   });
 
