@@ -146,3 +146,11 @@ All reference PDFs in `references/` inspected and recorded in `docs/REFERENCES.m
   - Simplified SNR chart caption to one line with crisp white-haloed threshold/marker labels; replaced Monte Carlo prose with a fixed-height 4-row structured summary (`Aktif`, `BER AWGN`, `BER Rayleigh`, `Baseline S0`) preserving previous valid results during async updates.
   - Redesigned the 3-frequency radial modulation map (`700` / `900` / `1800 MHz`) with seamless filled modulation zones, BTS center, yellow UE marker, and optional `Batas 95% andal` overlay toggle (OFF by default); stacked comparison tables full-width with compact headers so all columns display without clipping.
   - Added UI structure regression test in `tests/test_api.py` (125 total tests) and verified live drag, MC updates, radial map overlay, and Tabs A–D in headless Chrome.
+
+---
+
+## Final Website Replacement & Repository Cleanup: COMPLETE (2026-11-26, branch feature/native-web)
+- **HTML Freeze & Parity:** Adopted Zahran's standalone static HTML (`dashboard_rurallink.html`) byte-for-byte into `public/index.html` without altering any HTML, CSS, JS, formulas, or layout (`SHA256: 6a9a0ab73d9e622ccc622638e981a019f14ab00a0873ee3d371ed5afe3d89290`; `.gitattributes` preserves exact bytes across OS line endings).
+- **Archive & Cleanup:** Tagged `archive/native-web` at `cfc1a70` before removing obsolete FastAPI (`api/`), custom JS/CSS (`public/app.js`, `public/styles.css`, `public/favicon.svg`), Streamlit workbench (`app.py`, `.streamlit/`, `requirements-streamlit.txt`, `run_local.ps1`, `run_web.ps1`), obsolete web tests (`tests/test_api.py`, `tests/test_app.py`), and old prototype duplicates (`prototypes/`).
+- **Static Vercel Config & Branding:** Updated `vercel.json` for pure static hosting (`outputDirectory: "public"`, no functions/rewrites/build); generated `public/favicon.ico` from `docs/assets/rurallink-mark.svg` without modifying `public/index.html`.
+- **Research Preservation & Docs:** Kept `src/`, `config.py`, `experiments/`, `outputs/`, `glossary_data.py`, and all scientific tests (`tests/test_scientific_engine.py`, `tests/test_adaptive.py`, `tests/test_environment.py`) intact; updated `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, and `docs/` to separate the analytical static JS website from the Python bit-level Monte Carlo research engine.

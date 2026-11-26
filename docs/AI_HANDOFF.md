@@ -1,24 +1,22 @@
 # Panduan AI Asisten (AI Handoff) — RuralLink
 
-Dokumen ini memungkinkan setiap anggota tim menggunakan AI asisten masing-masing tanpa memerlukan riwayat percakapan awal.
+Dokumen ini memandu asisten AI agar selaras dengan keputusan final repositori.
 
 ## Konteks Singkat & Aturan Wajib
-- **Snapshot:** `2026-11-25` | **Baseline commit:** `88a1828`
-- **Urutan baca kanonik untuk AI:** `AGENTS.md` → `docs/PROGRESS.md` → `docs/METHODOLOGY.md` → `docs/RESULTS_GUIDE.md`.
-- **Aturan integritas:** AI **dilarang** mengarang angka hasil, mengklaim Fase 04–07 sudah selesai, atau mengubah asumsi di `config.py` tanpa mencatatnya di `docs/DECISIONS.md`. Semua hasil harus merujuk pada file aktual di `outputs/` dan `src/`.
+- **Urutan baca kanonik untuk AI:** `AGENTS.md` → `docs/PROJECT_CONTEXT.md` → `docs/DECISIONS.md` → `docs/PROGRESS.md`.
+- **HTML Freeze Mutlak:** `dashboard_rurallink.html` dan `public/index.html` adalah website statis kanonik karya Zahran dan **tidak boleh dimodifikasi** (harus tetap identik *byte-for-byte*, SHA256 `6a9a0ab73d9e622ccc622638e981a019f14ab00a0873ee3d371ed5afe3d89290`).
+- **Pemisahan Lapisan:** Website statis memakai JavaScript analitis di browser (*zero backend*), sedangkan `src/` dan `experiments/` adalah implementasi riset Python luring yang menghasilkan `outputs/`.
+- **Aturan integritas:** AI **dilarang** mengarang angka hasil, mengubah asumsi di `config.py` tanpa mencatatnya di `docs/DECISIONS.md`, atau melemahkan tes ilmiah.
 
 ---
 
-## 4 Prompt Siap Pakai
+## 3 Prompt Siap Pakai
 
 ### A. Memahami RuralLink sebagai Anggota Baru
-> Baca `AGENTS.md`, `README.md`, dan `docs/RESEARCH_OVERVIEW.md`. Jelaskan kepada saya dalam Bahasa Indonesia yang ringkas: (1) masalah *uplink* di wilayah 3T, (2) bagaimana modulasi adaptif dan alokasi RB bekerja, dan (3) fase mana yang sudah selesai vs masih *pending* berdasarkan `docs/PROGRESS.md`. Jangan mengarang hasil yang belum ada.
+> Baca `AGENTS.md`, `README.md`, dan `docs/RESEARCH_OVERVIEW.md`. Jelaskan secara ringkas dalam Bahasa Indonesia: (1) masalah *uplink* di wilayah 3T, (2) bagaimana modulasi adaptif dan alokasi RB bekerja, dan (3) perbedaan antara website JS analitis (`public/index.html`) dan eksperimen Monte Carlo Python (`src/`, `outputs/`).
 
-### B. Membantu Menyusun PPT dengan Bukti Terverifikasi
-> Baca `docs/TEAM_HANDOFF.md`, `docs/PRESENTATION_GUIDE.md`, dan `outputs/results/modulation_thresholds.csv`. Bantu saya menyusun draf teks slide PPT sesuai urutan 13 slide di `TEAM_HANDOFF.md`. Gunakan hanya angka dan klaim yang ada di tabel *Claim-to-Evidence*, sertakan label data (THEORETICAL / SIMULATED), dan tandai bagian Fase 04 sebagai *pending*.
+### B. Membantu Menyusun PPT & Analisis dengan Bukti Terverifikasi
+> Baca `docs/TEAM_HANDOFF.md`, `docs/RESULTS_GUIDE.md`, dan `outputs/summary.md`. Bantu saya menyusun narasi slide/analisis menggunakan angka terverifikasi dengan label data eksplisit (`THEORETICAL` / `SIMULATED`), perbedaan $E_b/N_0$ dan $E_s/N_0$, serta batasan ilmiah di `docs/METHODOLOGY.md`.
 
-### C. Membantu Menulis Analisis & Pembahasan dari CSV dan Grafik
-> Baca `docs/RESULTS_GUIDE.md`, `docs/METHODOLOGY.md`, `outputs/results/link_budget_validation.csv`, dan `outputs/results/ber_validation.csv`. Bantu saya menulis bagian Analisis & Pembahasan untuk grafik di `outputs/figures/`. Bedakan dengan jelas antara hasil teoretis dan simulasi Monte Carlo, jelaskan perbedaan $E_b/N_0$ dan $E_s/N_0$, serta cantumkan batasan ilmiah yang ada di `docs/METHODOLOGY.md`.
-
-### D. Melanjutkan Pengembangan Kode (Tanpa Menulis Ulang Engine)
-> Baca `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPER_GUIDE.md`, dan `config.py`. Saya ingin melanjutkan pengembangan (Fase 04 `src/adaptive.py` atau Fase 05 `app.py`). Jangan menulis ulang modul `src/` yang sudah tervalidasi. Pertahankan semua asumsi di `docs/METHODOLOGY.md`, ikuti konvensi satuan, dan pastikan `.venv\Scripts\python.exe -m pytest -q` serta `ruff check .` tetap lulus.
+### C. Melanjutkan Pengujian atau Eksperimen Python
+> Baca `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPER_GUIDE.md`, dan `config.py`. Jangan mengubah `dashboard_rurallink.html`, `public/index.html`, atau modul `src/` yang sudah tervalidasi tanpa keputusan di `docs/DECISIONS.md`, dan pastikan `.venv\Scripts\python.exe -m pytest -q` serta `ruff check .` tetap lulus.

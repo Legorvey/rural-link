@@ -20,11 +20,12 @@ Build a scientifically valid, reproducible, interactive simulator for uplink cov
 | Kementerian Komdigi, Performance Report 2025 | Indonesian context |
 
 ## Final deliverables
-1. Scientific simulation engine. 2. Bit-level Monte Carlo. 3. Adaptive modulation + bandwidth optimization. 4. Streamlit app. 5. Reproducible experiments. 6. Figures (publication quality) and CSV. 7. Automated tests. 8. Public deployment + offline fallback.
+1. Scientific simulation engine (`src/`). 2. Bit-level Monte Carlo validation. 3. Adaptive modulation + bandwidth optimization (`S0–S3`, `R0`). 4. Static interactive HTML website (`dashboard_rurallink.html` / `public/index.html`, with legacy Streamlit release archived in Git). 5. Reproducible experiments (`experiments/`). 6. Publication-quality figures and CSVs (`outputs/`). 7. Automated scientific tests (`tests/`). 8. Static Vercel deployment + direct offline HTML usage.
 
 ## Known limitations
-- No reference PDFs located in workspace; content of references not yet verified.
-- Scientific assumptions (channel model, parameters) undefined until Phase 02.
+- Propagation parameters are extrapolated from Park et al. (2023) 1400 MHz South Korea measurements without Indonesian 3T field calibration.
+- Uncoded link-level model without FEC, HARQ, inter-cell interference, or multi-user scheduling; radii reaching 12 km are right-censored (`>=12 km`).
+- Reference PDFs in `references/` are gitignored; verified facts are recorded in `docs/REFERENCES.md`.
 
 ## Current scope
-Phase 01 (environment setup) complete; no scientific functionality exists.
+Scientific engine (Phases 01–06), reproducible outputs, and Zahran's frozen static HTML website are complete and integrated.

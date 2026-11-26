@@ -3,14 +3,13 @@
 Dokumen ini mempersiapkan seluruh tim untuk presentasi pada **26 November 2026, 15.00 WIB** di hadapan **Bu Dessy**.
 
 ## 1. Alur Narasi & Demo Singkat
-- **Pembukaan (30 detik):** "RuralLink adalah simulator *link-level* untuk menganalisis batas jangkauan *uplink* di wilayah 3T Indonesia. Karena daya pancar HP jauh lebih kecil dari BTS, koneksi sering gagal di arah *uplink*. Kami memodelkan kombinasi modulasi adaptif dan penyempitan bandwidth (RB) pada 900 dan 1800 MHz."
-- **Urutan Demo (Saat ini):**
-  1. Jalankan `.venv\Scripts\python.exe -m streamlit run app.py` (saat ini menampilkan *environment & health check*; dashboard interaktif penuh direncanakan di Fase 05).
-  2. Tunjukkan 4 grafik tervalidasi di `outputs/figures/` dan jelaskan hasilnya menggunakan [docs/RESULTS_GUIDE.md](RESULTS_GUIDE.md).
+- **Pembukaan (30 detik):** "RuralLink adalah proyek riset *link-level* untuk menganalisis batas jangkauan *uplink* di wilayah 3T Indonesia. Karena daya pancar HP jauh lebih kecil dari BTS, koneksi sering gagal di arah *uplink*. Kami memodelkan kombinasi modulasi adaptif dan penyempitan bandwidth (RB) pada 900 dan 1800 MHz."
+- **Urutan Demo (Lihat detail di [docs/DEMO_GUIDE.md](DEMO_GUIDE.md)):**
+  1. Buka website statis `public/index.html` atau `dashboard_rurallink.html` langsung di browser (100% offline, tanpa backend).
+  2. Tunjukkan Tab **Simulator Interaktif** (perbandingan 900 vs 1800 MHz, skenario S0 vs S3, peta zona radial), lalu pindah ke Tab **Hasil Penelitian** untuk angka resmi dari `outputs/summary.md`.
 - **Rencana Pemulihan (Fallback):**
-  - Jika internet mati: Aplikasi berjalan 100% lokal (tidak butuh internet).
-  - Jika aplikasi gagal jalan: Gunakan gambar PNG di `outputs/figures/` dan tabel CSV di `outputs/results/` yang sudah tersimpan offline.
-- **Checklist Pra-Presentasi:** Pastikan `.venv` aktif, `pytest` lulus, dan folder `outputs/` berisi 4 PNG + 3 CSV.
+  - Website HTML berjalan 100% lokal tanpa internet dan tanpa Python.
+  - Grafik PNG di `outputs/figures/` dan tabel CSV di `outputs/results/` tersedia langsung untuk disisipkan di slide.
 
 ## 2. Tanya-Jawab (Q&A) Teknis (20 Pertanyaan)
 
@@ -23,14 +22,14 @@ Dokumen ini mempersiapkan seluruh tim untuk presentasi pada **26 November 2026, 
 7. **Mengapa Rayleigh lebih buruk daripada AWGN?** Karena kanal Rayleigh mengalami fluktuasi amplitudo acak (*multipath fading*) yang menyebabkan *deep fade* sesaat, sehingga rata-rata BER turun jauh lebih lambat.
 8. **Mengapa kurva BPSK dan QPSK berimpit terhadap $E_b/N_0$?** Karena QPSK dapat dipandang sebagai dua kanal BPSK ortogonal (I dan Q) yang masing-masing membawa 1 bit dengan energi per bit yang sama.
 9. **Mengapa ambang batas SNR ($E_s/N_0$) pergantian modulasi berbeda?** Karena $E_s/N_0 = E_b/N_0 + 10\log_{10}(k)$. QPSK ($k=2$) butuh `3,01 dB` lebih tinggi daripada BPSK ($k=1$).
-10. **Mengapa mempersempit bandwidth meningkatkan SNR?** Pada daya pancar total UE yang tetap, memperkecil jumlah RB menurunkan daya derau termal penerima ($N = -174 + 10\log_{10}(B) + \mathrm{NF}$), sehingga SNR naik.
+10. **Mengapa mempersempit bandwidth meningkatkan SNR?** Pada daya pancar total UE yang tetap, memperkecil jumlah RB menurunkan daya derau termal penerima ($N = -174 + 10\log_{10}(B) + \mathrm{NF}$), sehingga SNR naik (`+13,98 dB` dari 25 ke 1 RB).
 11. **Apakah modulasi adaptif memperbesar daya terima?** Tidak. Modulasi adaptif hanya memilih skema deteksi yang lebih tahan derau, tidak mengubah daya terima maupun *path loss*.
 12. **Apa arti $\text{BER} = 0{,}01$?** Rata-rata 1 bit salah dari setiap 100 bit yang dikirim; digunakan sebagai target batas keandalan sebelum *channel coding* (mengikuti Khan 2025).
 13. **Bagaimana *outage* didefinisikan?** Kondisi ketika SNR atau BER gagal memenuhi target keandalan ($\text{BER} > 10^{-2}$), dengan batas probabilitas *outage* target $P_{\text{out}} \le 5\%$ (95% keandalan).
-14. **Apa itu simulasi Monte Carlo?** Metode mengirim jutaan bit acak melalui model kanal dan menghitung rasio kesalahan bit secara empiris untuk memvalidasi rumus teoretis.
-15. **Bagaimana cara memvalidasi simulasi?** Membandingkan kurva Monte Carlo dengan rumus eksak (Cho–Yoon AWGN & Rayleigh), memeriksa konservasi energi $E_s = 1$, dan menjalankan 77 tes otomatis `pytest`.
+14. **Apa itu simulasi Monte Carlo?** Metode mengirim jutaan bit acak melalui model kanal di mesin Python dan menghitung rasio kesalahan bit secara empiris untuk memvalidasi rumus teoretis.
+15. **Bagaimana cara memvalidasi simulasi?** Membandingkan kurva Monte Carlo Python dengan rumus eksak (Cho–Yoon AWGN & Rayleigh), memeriksa konservasi energi $E_s = 1$, dan menjalankan pengujian otomatis `pytest`.
 16. **Apakah laju data yang dihitung adalah *throughput* LTE nyata?** Bukan. Ini adalah *nominal data rate* ($B_{\text{active}} \cdot k$) tanpa *overhead* protokol, *cyclic prefix*, maupun FEC.
 17. **Apakah estimasi jangkauan ini berlaku untuk seluruh Indonesia?** Tidak. Ini adalah simulasi *link-level* dengan parameter ekstrapolasi, bukan pemetaan geografis nasional.
-18. **Mengapa tidak ada implementasi perangkat keras?** Karena fokus proyek Sistem Komunikasi Digital ini adalah pemodelan matematis dan simulasi *link-level* yang dapat direproduksi.
-19. **Apa kontribusi kelompok?** Membangun mesin simulasi *bit-level* tervalidasi, menyatukan model propagasi–modulasi–RB, dan menyediakan dokumentasi serta pengujian otomatis.
-20. **Apa keterbatasan yang masih tersisa?** Belum ada kalibrasi lapangan Indonesia, asumsi CSI sempurna, tanpa FEC/interferensi, serta Fase 04 (optimasi S0–S3) dan Fase 05 (UI penuh) masih *pending*.
+18. **Apa perbedaan website HTML dan simulasi Python di repo ini?** Website statis (`public/index.html`) memakai perhitungan analitis JavaScript untuk respons instan di browser, sedangkan eksperimen Python (`src/`, `experiments/`) menjalankan simulasi stokastik (`5.000` realisasi) dan validasi Monte Carlo *bit-level* (`1.000.000` bit) untuk menghasilkan `outputs/`.
+19. **Apa kontribusi kelompok?** Membangun mesin simulasi *bit-level* tervalidasi (Python), mengevaluasi optimasi adaptif S0–S3 dan R0, serta menyajikan dashboard web statis interaktif karya Zahran.
+20. **Apa keterbatasan yang masih tersisa?** Belum ada kalibrasi lapangan Indonesia, asumsi CSI sempurna, tanpa FEC/interferensi antar-sel, dan estimasi radius `>=12 km` tersensor oleh batas grid uji.

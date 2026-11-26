@@ -1,6 +1,6 @@
 # Kamus Istilah Teknis & Persamaan (Ensiklopedia RuralLink)
 
-Total entri: **127** istilah dalam **10** kategori. Dokumen ini dihasilkan langsung dari `glossary_data.py` agar selalu konsisten dengan Tab D di aplikasi Streamlit.
+Total entri: **127** istilah dalam **10** kategori. Dokumen ini disinkronkan dengan `glossary_data.py` dan Tab `Kamus & Persamaan (127)` pada website RuralLink.
 
 Penanda status pada setiap entri:
 - `[Diimplementasikan di RuralLink]` — aktif dihitung oleh `src/` atau `config.py`.
