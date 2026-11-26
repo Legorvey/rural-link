@@ -195,6 +195,13 @@
               <button type="button" class="seg-btn active" data-nbits="100000" aria-pressed="true">10⁵</button>
               <button type="button" class="seg-btn" data-nbits="1000000" aria-pressed="false">10⁶</button>
             </div>
+            <label class="toggle-row" for="chkLiveMc">
+              <span>Simulasi Langsung (Live)</span>
+              <input type="checkbox" id="chkLiveMc" checked />
+            </label>
+            <p class="control-hint">
+              Saat aktif, perubahan parameter otomatis menghitung ulang Monte Carlo setelah interaksi stabil.
+            </p>
             <p class="notice-bar warn" id="mcSmallSampleWarn" hidden>
               Sampel kecil memiliki ketidakpastian statistik tinggi (interval kepercayaan lebar dan berpeluang 0 error pada BER rendah).
             </p>
@@ -290,16 +297,18 @@
             <article class="panel chart-panel">
               <div class="chart-head">
                 <h2 id="snrChartTitle">Kurva SNR terhadap Jarak (700 / 900 / 1800 MHz, THEORETICAL)</h2>
-                <span class="chart-note">Garis penuh: 1 RB · Putus pendek: 25 RB · Garis horizontal: ambang Es/N0 Cho &amp; Yoon</span>
+                <span class="status-pill" id="snrUpdateStatus">Siap · Seret titik atau klik grafik</span>
               </div>
-              <canvas id="cvSnr" width="660" height="310"></canvas>
+              <span class="chart-note">Garis penuh: 1 RB · Putus pendek: 25 RB · Garis horizontal: ambang Es/N0 Cho &amp; Yoon · Titik kuning: geser jarak (1–12 km)</span>
+              <canvas id="cvSnr" width="660" height="310" aria-label="Grafik interaktif SNR terhadap jarak; geser titik aktif untuk mengubah jarak"></canvas>
             </article>
 
             <article class="panel chart-panel">
               <div class="chart-head">
                 <h2>Monte Carlo Bit-Level &amp; Konstelasi Diterima (SIMULATED)</h2>
-                <span class="chart-note" id="mcPairSummary">Aktif vs S0</span>
+                <span class="status-pill" id="mcStatusPill">Siap</span>
               </div>
+              <span class="chart-note" id="mcPairSummary">Aktif vs S0</span>
               <div class="mc-toolbar">
                 <button type="button" class="btn-primary" id="btnRunMc">Jalankan Monte Carlo</button>
                 <div class="segmented two-col" role="group" aria-label="Pilih Tampilan Konstelasi">
@@ -307,9 +316,7 @@
                   <button type="button" class="seg-btn" data-mcview="by_freq" aria-pressed="false">Antar Frekuensi</button>
                 </div>
               </div>
-              <div class="notice-bar info" id="mcStateNotice">
-                Belum dijalankan. Tekan Jalankan Monte Carlo untuk mengirim bit acak melalui kanal AWGN dan Rayleigh.
-              </div>
+              <div class="notice-bar info" id="mcStateNotice" hidden></div>
               <div class="mc-stats" id="mcStatsBox" hidden></div>
               <canvas id="cvConst" width="600" height="275"></canvas>
             </article>

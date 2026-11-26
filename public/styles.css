@@ -468,6 +468,57 @@ canvas {
   border-radius: 4px;
 }
 
+#cvSnr {
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+#cvSnr.dragging {
+  cursor: grabbing;
+  touch-action: none;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 2px 8px;
+  min-height: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-pill.updating {
+  color: var(--navy);
+  border-color: #93C5FD;
+  background: #EFF6FF;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  background: var(--surface-alt);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--navy);
+}
+
 .mc-toolbar {
   display: flex;
   flex-wrap: wrap;
