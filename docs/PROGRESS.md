@@ -86,3 +86,29 @@ All reference PDFs in `references/` inspected and recorded in `docs/REFERENCES.m
   - Created `CONTRIBUTING.md`, `CITATION.cff`, and `docs/assets/rurallink-mark.svg`; updated `AGENTS.md`.
 - **Current Scientific Status:** Phase 01–03 complete and independently audited (77/77 tests passing, 0 ruff errors). Phase 04 (`src/adaptive.py` and S0–S3 comparative experiments), Phase 05 (full Streamlit dashboard), Phase 06 (final audit), and Phase 07 (deployment) remain **pending** authorization.
 - **Documentation Limitations:** Phase 04–07 sections are explicitly marked pending; PPT and analysis team member pairings remain pending confirmation.
+
+---
+
+## Phase 04-05: COMPLETE (2026-11-26, branch feature/scientific-app)
+- **Phase 04:** `src/adaptive.py` (joint optimizer, S0-S3, shadowing reliability, bit-level validation), `experiments/run_adaptive.py`, `tests/test_adaptive.py`. Outputs: `outputs/results/adaptive_coverage_curves.csv`, `adaptive_coverage_summary.csv`, `adaptive_mc_validation.csv`; `outputs/figures/adaptive_coverage_radius.png`, `adaptive_rate_vs_distance.png`.
+- **Phase 05:** `app.py` Streamlit workbench (left rail, telemetry strip, coverage zones, operating points, bit-level MC with engine constellation samples, method tab); `tests/test_app.py` AppTest smoke tests; light theme in `.streamlit/config.toml`.
+- **Checks:** pytest 91 passed, ruff check and format clean.
+- **Pending:** Phase 06 final audit and Phase 07 deployment (not started, no merge).
+
+---
+
+## Phase 06 targeted audit: COMPLETE (2026-11-26)
+- **Defect fixed:** Phase 05 evaluated only slow (shadowing) adaptation. Added instantaneous-CSI evaluation: per shared Rayleigh+shadowing realization the max-rate option meeting the AWGN Eb/N0 threshold is chosen; BER is the conditional AWGN BER (max 1e-2 by construction). The earlier 4-7 % BER is the no-CSI average Rayleigh BER at slow-selected points (clarified in `outputs/summary.md`).
+- **Fixed:** radii now reported as `<1 km` (no coverage at first tested point) and `>=12 km` (right-censored); added R0 fixed BPSK/1 RB reference; outage-adjusted effective rate (outage = 0) exported.
+- **Verified unchanged:** shared realizations across scenarios, Es/N0 to Eb/N0 conversion (k = log2 M), 23 dBm cap, UI values from `src/` only.
+- **Exports:** `adaptive_coverage_curves.csv`, `adaptive_coverage_summary.csv`, `adaptive_strategy_comparison.csv`, `adaptive_mc_validation.csv`, `outputs/summary.md`.
+- **Checks:** pytest 93 passed (incl. AppTest), ruff clean, experiments rerun.
+- **Pending:** Phase 07 deployment (not started, no merge).
+
+---
+
+## Phase 07 release preparation: COMPLETE (2026-11-26, branch feature/scientific-app)
+- **Runtime & Cloud compatibility:** Pinned Linux-compatible runtime dependencies in `requirements.txt` (`numpy==2.5.5`, `scipy==1.18.1`, `pandas==3.1.1`, `matplotlib==3.11.2`, `plotly==7.2.0`, `streamlit==1.67.0`) for Python 3.12 (`.python-version`). Verified no Windows-specific packages, local PDF dependencies, absolute Windows paths, external APIs, or secrets in runtime code.
+- **Offline launcher & docs:** Added `run_local.ps1` for offline `.venv` launch; updated `README.md` with Streamlit Community Cloud deployment settings (`feature/scientific-app`, `app.py`, Python 3.12) and live demo sequence.
+- **Artifacts:** All `outputs/` CSVs, PNGs, and `outputs/summary.md` verified tracked in Git.
+- **Checks:** `pytest` 93 passed (including AppTest), `ruff check` and `ruff format --check` clean.
