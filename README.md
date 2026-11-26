@@ -15,7 +15,7 @@
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-0F172A?style=flat-square&logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.67-065F46?style=flat-square&logo=streamlit&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Phase%2007%20Ready-10B981?style=flat-square)
-![Tests](https://img.shields.io/badge/Tests-93%20Passed-0284C7?style=flat-square)
+![Tests](https://img.shields.io/badge/Tests-96%20Passed-0284C7?style=flat-square)
 ![Deployment](https://img.shields.io/badge/Deployment-Release%20Ready-0F766E?style=flat-square)
 
 *Snapshot: `2026-11-25` | Baseline commit: `88a1828` | Jadwal presentasi: `26 November 2026, 15.00 WIB`*
@@ -196,16 +196,16 @@ Ambang batas pergantian modulasi pada $\text{BER} = 10^{-2}$ di kanal AWGN ([mod
 - **Peluncuran offline cepat (Windows):** jalankan `.\run_local.ps1`.
 - **Deployment Streamlit Community Cloud:**
   - **Repository:** `Legorvey/rural-link`
-  - **Branch:** `feature/scientific-app`
+  - **Branch:** `feature/final-integration`
   - **Main file path:** `app.py`
   - **Python version:** `3.12` (`.python-version`)
   - **Dependencies:** `requirements.txt` (versi Linux-compatible terpin)
-- **Urutan Demo Langsung (Live Demo Sequence):**
-  1. Buka `app.py` (default: `900 MHz`, `NLOS`, `23 dBm`, jarak `5.0 km`, semua skenario aktif).
-  2. Tunjukkan tab **Coverage zones** untuk membandingkan radius deterministik (*median PL*) vs reliabilitas stokastik (*shadowing* & *Rayleigh CSI*).
-  3. Ubah frekuensi dari `900 MHz` ke `1800 MHz` di panel kiri untuk memperlihatkan penyempitan jangkauan dan kenaikan outage pada strip telemetri.
-  4. Buka tab **Operating points** untuk melihat transisi adaptif modulasi dan *Resource Block* terhadap jarak.
-  5. Buka tab **Bit-level validation**, klik **Run Monte Carlo transmission** untuk membuktikan BER *bit-level* serta konstelasi AWGN vs Rayleigh hasil *equalization* secara langsung.
+- **Urutan Demo Langsung (Live Demo Sequence):** lihat panduan lengkap di [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md):
+  1. Buka `app.py` dan klik **Preset: pemulihan tepi sel** (`900 MHz`, `NLOS`, `23 dBm`, `5.0 km`, `S3`).
+  2. Bandingkan `900 MHz` vs `1800 MHz` serta tabel strategi `S0–S3` & `R0` pada tab **A. Simulator langsung**.
+  3. Klik **Jalankan simulasi Monte Carlo** untuk BER *bit-level* dan konstelasi nyata dari mesin Python.
+  4. Buka tab **B. Visualisasi cakupan** untuk model zona radial 900 vs 1800 MHz (median vs andal 95%).
+  5. Buka tab **C. Hasil penelitian** untuk grafik publikasi, unduhan CSV/PNG, dan `outputs/summary.md`.
 - **Rencana cadangan presentasi:** (A) Aplikasi Streamlit ter-deploy → (B) Aplikasi Streamlit lokal (`.\run_local.ps1`) → (C) Grafik PNG, CSV, dan `outputs/summary.md`.
 
 ---
@@ -245,7 +245,8 @@ rural-link/
 ├── run_local.ps1              # Skrip peluncuran offline lokal (.venv)
 ├── src/                       # Mesin simulasi ilmiah + optimasi adaptif (adaptive.py)
 ├── experiments/               # Skrip eksperimen deterministik (run_experiments.py, run_adaptive.py)
-├── tests/                     # 93 pengujian otomatis (unit, ilmiah, & Streamlit AppTest)
+├── tests/                     # 96 pengujian otomatis (unit, ilmiah, & Streamlit AppTest)
+├── prototypes/                # Prototipe HTML/CSS/JS awal buatan Zahran (referensi desain)
 ├── outputs/                   # Grafik PNG & tabel CSV tervalidasi
 ├── references/                # PDF referensi lokal (di-gitignore, tidak di-commit)
 └── docs/                      # Dokumentasi lengkap tim, metode, dan handoff

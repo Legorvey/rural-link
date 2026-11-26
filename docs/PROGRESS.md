@@ -112,3 +112,11 @@ All reference PDFs in `references/` inspected and recorded in `docs/REFERENCES.m
 - **Offline launcher & docs:** Added `run_local.ps1` for offline `.venv` launch; updated `README.md` with Streamlit Community Cloud deployment settings (`feature/scientific-app`, `app.py`, Python 3.12) and live demo sequence.
 - **Artifacts:** All `outputs/` CSVs, PNGs, and `outputs/summary.md` verified tracked in Git.
 - **Checks:** `pytest` 93 passed (including AppTest), `ruff check` and `ruff format --check` clean.
+
+---
+
+## Final Integration & Presentation Release: COMPLETE (2026-11-26, branch feature/final-integration)
+- **Git integration:** Created `feature/final-integration` from `origin/feature/ui-prototype` (`5c3a7d9`), merged `origin/feature/scientific-app` (`8d5c541`) preserving both histories without modifying original branches. Moved `dashboard_rurallink.html` to `prototypes/dashboard_rurallink.html` with `prototypes/README.md` (explicitly labeled prototype; defects not inherited).
+- **Integrated Streamlit workbench (`app.py`):** Light engineering workbench inspired by Zahran's prototype (left parameter rail, segmented controls, 8-cell telemetry strip, SNR curves, bit-level MC constellation, side-by-side 900/1800 MHz radial coverage zones, S0-S3 & R0 comparison, research results tab with CSV/PNG downloads, Indonesian methodology & team attribution). All values originate from `src/`.
+- **Docs & demo:** Added `docs/DEMO_GUIDE.md`; updated `README.md` and `docs/PROGRESS.md`.
+- **Checks:** `pytest` 96 passed (incl. 8 AppTest cases), `ruff check` and `ruff format --check` clean.
