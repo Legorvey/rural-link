@@ -120,3 +120,10 @@ All reference PDFs in `references/` inspected and recorded in `docs/REFERENCES.m
 - **Integrated Streamlit workbench (`app.py`):** Light engineering workbench inspired by Zahran's prototype (left parameter rail, segmented controls, 8-cell telemetry strip, SNR curves, bit-level MC constellation, side-by-side 900/1800 MHz radial coverage zones, S0-S3 & R0 comparison, research results tab with CSV/PNG downloads, Indonesian methodology & team attribution). All values originate from `src/`.
 - **Docs & demo:** Added `docs/DEMO_GUIDE.md`; updated `README.md` and `docs/PROGRESS.md`.
 - **Checks:** `pytest` 96 passed (incl. 8 AppTest cases), `ruff check` and `ruff format --check` clean.
+
+---
+
+## Interactive Workbench Upgrade: COMPLETE (2026-11-26, branch feature/interactive-workbench)
+- **Single-page primary workbench (`app.py`):** Consolidated telemetry strip, interactive SNR vs distance (with active distance/operating-point marker), explicit bit-level Monte Carlo with side-by-side received constellations (`Dioptimalkan vs S0` and `Antar Frekuensi` using identical seed), side-by-side radial modulation coverage maps, fixed vs adaptive strategy comparison, and frequency comparison table into Tab A; kept published CSV/PNG results (Tab B) and methodology/limitations (Tab C) in secondary tabs.
+- **Optional exploratory sensitivity (UI-only, `src/` & `outputs/` untouched):** Added dynamic BER target (`1e-2` primary / `1e-3` exploratory via `derive_switching_thresholds`) and supplementary `700 MHz` toggle (labeled exploratory inspired by Reddy 2022, not replication). Per-frequency caching avoids recomputation on unrelated widget changes.
+- **Docs & tests:** Updated `tests/test_app.py`, `README.md`, `docs/DEMO_GUIDE.md`, `docs/DECISIONS.md` (D17), and `docs/PROGRESS.md`.
