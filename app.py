@@ -56,7 +56,16 @@ NAVY, TEAL, AMBER, SLATE, GREY, INK = (
     "#64748B",
     "#0F172A",
 )
+FREQ_OPTIONS = (700.0, 900.0, 1800.0)
 FREQ_COLOR = {700.0: SLATE, 900.0: NAVY, 1800.0: TEAL}
+MC_BIT_CHOICES = (100, 1_000, 10_000, 100_000, 1_000_000)
+MC_BIT_LABELS = {
+    100: "10²",
+    1_000: "10³",
+    10_000: "10⁴",
+    100_000: "10⁵",
+    1_000_000: "10⁶",
+}
 MOD_COLOR = {
     "BPSK": "#B45309",
     "QPSK": "#7FA6C9",
@@ -161,6 +170,12 @@ def freq_tag(freq_mhz: float) -> str:
     return f"{freq_mhz:.0f} MHz (eksploratori)" if freq_mhz == 700.0 else f"{freq_mhz:.0f} MHz"
 
 
+def align_mc_bits(n_bits: int, modulation: str) -> int:
+    """Align requested bit count upward to an exact multiple of bits_per_symbol."""
+    k = bits_per_symbol(modulation)
+    return max(k, ((int(n_bits) + k - 1) // k) * k)
+
+
 def evaluate_link(
     freq: float,
     env: str,
@@ -255,7 +270,6 @@ DEFAULTS = {
     "shadow": "median",
     "nbits": 100_000,
     "ber_target": 1e-2,
-    "inc_700": False,
     "zone_sc": "S3",
     "mc_view": "Dioptimalkan vs S0",
 }
@@ -293,13 +307,14 @@ with st.sidebar:
         width="stretch",
         help="900 MHz NLOS, 5 km, 23 dBm, S3, BER 1e-2. Baseline S0 mengalami outage di jarak ini.",
     )
-    inc_700 = st.session_state.get("inc_700", False)
-    freq_options = (700.0, 900.0, 1800.0) if inc_700 else CFG.carrier_frequencies_mhz
     freq = seg(
         "Frekuensi pembawa (MHz)",
-        list(freq_options),
+        list(FREQ_OPTIONS),
         "freq",
-        fmt=lambda x: "700*" if x == 700.0 else f"{x:.0f}",
+        fmt=lambda x: "700* (supl.)" if x == 700.0 else f"{x:.0f}",
+    )
+    st.caption(
+        "Primer: 900 & 1800 MHz. *700 MHz: suplemen eksploratori (terinspirasi Reddy 2022 di atas model CI Park 2023)."
     )
     env = seg("Lingkungan propagasi", ["LOS", "NLOS"], "env")
     shadow = seg(
@@ -339,33 +354,30 @@ with st.sidebar:
     )
     rb_m = seg("Jumlah RB (manual)", list(CFG.active_rb_choices), "rb", disabled=not manual)
     mod_m = seg("Modulasi (manual)", list(CFG.modulations), "mod", disabled=not manual)
-    n_bits = st.select_slider(
-        "Bit per kanal (Monte Carlo)", (100_000, 500_000, 1_000_000), key="nbits"
+    ber_target = seg(
+        "Target BER",
+        [1e-2, 1e-3],
+        "ber_target",
+        fmt=lambda x: "10⁻² (Primer)" if np.isclose(x, 1e-2) else "10⁻³ (Eksploratori)",
     )
-
-    with st.expander("Sensitivitas eksploratori (opsional)", expanded=False):
-        ber_target = seg(
-            "Target BER",
-            [1e-2, 1e-3],
-            "ber_target",
-            fmt=lambda x: "1e-2 (Primer)" if np.isclose(x, 1e-2) else "1e-3 (Eksploratori)",
-        )
-        inc_700 = st.checkbox(
-            "Sertakan 700 MHz (suplemen terinspirasi Reddy 2022)",
-            key="inc_700",
-            help="Tambahan eksploratori di atas model CI Park (2023). Bukan replikasi Reddy (2022).",
-        )
-        st.caption(
-            "Konfigurasi riset utama: 900/1800 MHz pada BER 1e-2. Ambang 1e-3 dihitung dinamis oleh src/modulation.py."
+    n_bits = st.select_slider(
+        "Jumlah bit (Monte Carlo)",
+        options=MC_BIT_CHOICES,
+        format_func=lambda n: MC_BIT_LABELS[n],
+        key="nbits",
+    )
+    st.caption(f"Ukuran sampel dipilih: {MC_BIT_LABELS[n_bits]} = {n_bits:,} bit per kanal.")
+    if n_bits < 100_000:
+        st.warning(
+            f"Sampel kecil ({n_bits:,} bit) memiliki ketidakpastian statistik tinggi "
+            "(interval kepercayaan lebar dan berpeluang 0 error pada BER rendah)."
         )
 
     st.caption(
         f"Target BER {ber_target:g}. Target outage {CFG.outage_target:.0%}. Seed {CFG.default_seed}. Berjalan offline."
     )
 
-freq_options = (700.0, 900.0, 1800.0) if inc_700 else CFG.carrier_frequencies_mhz
-if freq not in freq_options:
-    freq = 900.0
+freq_options = FREQ_OPTIONS
 
 try:
     curves, summary = load_active_curves(freq_options, env, float(ptx), float(ber_target))
@@ -375,7 +387,7 @@ except ValueError as exc:
     st.error(f"Parameter ditolak oleh mesin: {exc}")
     st.stop()
 
-is_exploratory = inc_700 or not np.isclose(ber_target, CFG.ber_target)
+is_exploratory = (freq == 700.0) or not np.isclose(ber_target, CFG.ber_target)
 
 tab_wb, tab_res, tab_met = st.tabs(
     ["A. Workbench interaktif", "B. Hasil penelitian (CSV & PNG)", "C. Metodologi & Batasan"]
@@ -772,9 +784,8 @@ with tab_wb:
             strat,
             rb_m,
             mod_m,
-            n_bits,
+            int(n_bits),
             float(ber_target),
-            freq_options,
         )
         if run_clicked:
             by_freq = {}
@@ -791,12 +802,18 @@ with tab_wb:
                     float(ber_target),
                 )
                 by_freq[f_item] = (
-                    cached_mc(lk_f["mod"], lk_f["ebn0"], int(n_bits)) if lk_f["ok"] else None
+                    cached_mc(lk_f["mod"], lk_f["ebn0"], align_mc_bits(n_bits, lk_f["mod"]))
+                    if lk_f["ok"]
+                    else None
                 )
             st.session_state["mc"] = {
                 "key": key_now,
-                "opt": cached_mc(link["mod"], link["ebn0"], int(n_bits)),
-                "base": cached_mc(base["mod"], base["ebn0"], int(n_bits)) if base["ok"] else None,
+                "opt": cached_mc(link["mod"], link["ebn0"], align_mc_bits(n_bits, link["mod"])),
+                "base": (
+                    cached_mc(base["mod"], base["ebn0"], align_mc_bits(n_bits, base["mod"]))
+                    if base["ok"]
+                    else None
+                ),
                 "by_freq": by_freq,
             }
 
@@ -806,13 +823,15 @@ with tab_wb:
         elif mc is None:
             st.info(
                 f"Belum dijalankan. Tekan Jalankan Monte Carlo untuk mengirim {n_bits:,} bit acak "
-                "melalui kanal AWGN dan Rayleigh di mesin Python."
+                f"(diselaraskan ke kelipatan {bits_per_symbol(link['mod'])} bit/simbol = "
+                f"{align_mc_bits(n_bits, link['mod']):,} bit) melalui kanal AWGN dan Rayleigh."
+            )
+        elif mc["key"] != key_now:
+            st.warning(
+                "Parameter berubah sejak simulasi terakhir. Hasil sebelumnya disembunyikan agar tidak "
+                "dianggap sebagai hasil aktif; jalankan ulang Monte Carlo."
             )
         else:
-            if mc["key"] != key_now:
-                st.warning(
-                    "Parameter berubah sejak simulasi terakhir. Jalankan ulang untuk memperbarui hasil."
-                )
             ch = "awgn" if chan == "AWGN" else "rayleigh"
             view_mode = seg(
                 "Tampilan konstelasi",
@@ -824,9 +843,17 @@ with tab_wb:
                     st.caption(f"**{name}**: outage, tidak ada transmisi.")
                     continue
                 ci = res[f"ci_low_{ch}"], res[f"ci_high_{ch}"]
-                ci_txt = "" if ci[0] is None else f", CI 95% [{ci[0]:.1e}, {ci[1]:.1e}]"
+                if ci[0] is None:
+                    ci_txt = ""
+                elif res[f"mc_errors_{ch}"] == 0:
+                    ci_txt = f", CI 95% [0.0e+00, {ci[1]:.1e}] (0 error, batas atas rule-of-three)"
+                else:
+                    ci_txt = f", CI 95% [{ci[0]:.1e}, {ci[1]:.1e}]"
+                n_sym = res["n_bits"] // bits_per_symbol(res["modulation"])
+                n_smp = int(res[f"samples_{ch}"].size)
                 st.caption(
-                    f"**{name}** ({res['modulation']}, Eb/N0 {res['ebn0_db']:.2f} dB, {res['n_bits']:,} bit): "
+                    f"**{name}** ({res['modulation']}, Eb/N0 {res['ebn0_db']:.2f} dB, "
+                    f"{res['n_bits']:,} bit / {n_sym:,} simbol, sampel konstelasi {n_smp:,}): "
                     f"BER MC AWGN {res['mc_ber_awgn']:.2e} (teori {res['theory_ber_awgn']:.2e}); "
                     f"Rayleigh tanpa CSI {res['mc_ber_rayleigh']:.2e} (teori {res['theory_ber_rayleigh']:.2e}){ci_txt}."
                 )
@@ -1127,7 +1154,7 @@ with tab_met:
     st.markdown("#### Batasan")
     st.markdown(
         """
-- Konfigurasi riset utama adalah 900 dan 1800 MHz pada BER 1e-2. Opsi 700 MHz (terinspirasi Reddy 2022) dan BER 1e-3 di panel sensitivitas adalah analisis eksploratori, bukan replikasi Reddy (2022).
+- Konfigurasi riset utama adalah 900 dan 1800 MHz pada BER 1e-2. Opsi 700 MHz (terinspirasi Reddy 2022) dan BER 1e-3 di panel kiri adalah analisis suplemen eksploratori, bukan replikasi Reddy (2022).
 - Laju nominal tanpa channel coding, overhead, dan penjadwalan. Bukan throughput LTE.
 - Parameter CI diekstrapolasi dari kampanye Park (2023), belum ada data lapangan Indonesia.
 - Tampilan zona adalah model radial hipotetis, bukan prediksi cakupan geografis.

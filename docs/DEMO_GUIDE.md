@@ -24,10 +24,10 @@ Seluruh metrik, kurva, zona, dan konstelasi berasal dari mesin Python (`src/`).
 - Tunjukkan bahwa nilai BER MC dan titik konstelasi I/Q berasal dari transmisi bit acak aktual di mesin Python (`src/metrics.py` dan `src/channels.py`), bukan titik sintetis statis.
 - Gunakan tombol tampilan konstelasi **Dioptimalkan vs S0** dan **Antar Frekuensi** untuk membandingkan konstelasi yang diterima secara sisi-ke-sisi dengan seed identik.
 
-## 5. Sensitivitas Eksploratori Opsional (700 MHz & BER 1e-3)
-- Buka bagian **Sensitivitas eksploratori (opsional)** di bagian bawah panel kiri bila ingin meninjau sensitivitas:
-  - Ubah **Target BER** dari `1e-2 (Primer)` ke `1e-3 (Eksploratori)` untuk melihat ambang `Es/N0` dan kurva/tabel diperbarui dinamis oleh `src/modulation.py`.
-  - Centang **Sertakan 700 MHz** sebagai frekuensi suplemen eksploratori yang terinspirasi Reddy (2022) di atas model CI Park (2023) (bukan replikasi Reddy).
+## 5. Kontrol Suplemen Eksploratori di Panel Kiri (700 MHz & BER 1e-3)
+- Gunakan langsung di panel kiri bila ingin meninjau sensitivitas:
+  - Ubah **Target BER** dari `10⁻² (Primer)` ke `10⁻³ (Eksploratori)` untuk melihat ambang `Es/N0` dan kurva/tabel diperbarui dinamis oleh `src/modulation.py`.
+  - Pilih **700* (supl.)** pada **Frekuensi pembawa (MHz)** sebagai frekuensi suplemen eksploratori yang terinspirasi Reddy (2022) di atas model CI Park (2023) (bukan replikasi Reddy); ketiga frekuensi tampil langsung di grafik/peta perbandingan.
 - Kembalikan ke preset awal sebelum membahas hasil publikasi agar konfigurasi riset utama (`900/1800 MHz`, `BER 1e-2`) tetap jelas.
 
 ## 6. Temuan Penelitian Utama (Tab B. Hasil penelitian)

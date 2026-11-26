@@ -94,7 +94,7 @@ Buka [https://rural-link.streamlit.app/](https://rural-link.streamlit.app/) di b
 2. Amati seluruh instrumen utama dalam satu halaman **A. Workbench interaktif**: *telemetry strip*, grafik **SNR vs jarak** dengan penanda jarak aktif, **peta zona modulasi radial sisi-ke-sisi**, tabel **Fixed vs adaptif**, dan tabel **Perbandingan frekuensi**.
 3. Bandingkan frekuensi **900** dan **1800** MHz pada kontrol *segmented*, ubah lingkungan (`LOS` / `NLOS`), dan geser jarak (`1–12 km`).
 4. Klik **Jalankan Monte Carlo** untuk menjalankan transmisi bit acak aktual dan membandingkan konstelasi I/Q nyata (**Dioptimalkan vs S0** maupun **Antar Frekuensi**).
-5. (Opsional) Buka **Sensitivitas eksploratori** di panel kiri untuk menguji target BER `1e-3` atau suplemen `700 MHz` (eksploratori terinspirasi Reddy 2022, bukan replikasi Reddy, dan tidak mengubah `outputs/`).
+5. (Opsional) Uji target BER `1e-3` atau frekuensi `700 MHz` langsung dari panel kiri (suplemen eksploratori terinspirasi Reddy 2022, bukan replikasi Reddy, dan tidak mengubah `outputs/`).
 6. Buka tab **B. Hasil penelitian (CSV & PNG)** untuk melihat grafik publikasi serta mengunduh file `.csv` maupun `.png`, dan tab **C. Metodologi & Batasan** untuk persamaan matematis.
 
 ---
