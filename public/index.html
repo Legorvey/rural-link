@@ -10,28 +10,14 @@
 <body>
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="topbar-row">
-        <div class="brand-block">
-          <h1>RuralLink: Workbench Jangkauan Uplink Adaptif</h1>
-          <p class="brand-sub">
-            Analisis Peningkatan Jangkauan Uplink melalui Modulasi Adaptif dan Alokasi Bandwidth pada Frekuensi 900 MHz dan 1800 MHz di Wilayah 3T Indonesia
-          </p>
-          <p class="brand-sub">
-            <strong>Kelompok 1</strong> | Sistem Komunikasi Digital (2026) | Tim: Aditya, Zahran, Baihaqy, Jeyd, Rizqul, Yusril
-          </p>
-        </div>
-        <div class="topbar-meta">
-          <span class="pill-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-              <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-              <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-              <circle cx="12" cy="20" r="1" />
-            </svg>
-            Model: Park (2023) · Reddy (2022) · Khan (2025) · Cho &amp; Yoon (2002)
-          </span>
-          <span>B_ch = 5 MHz (maks 25 RB = 4,5 MHz) · NF = 4 dB · UE ≤ 23 dBm</span>
-        </div>
+      <div class="brand-block">
+        <h1>RuralLink: Workbench Jangkauan Uplink Adaptif</h1>
+        <p class="brand-sub">
+          Analisis peningkatan jangkauan uplink melalui modulasi adaptif &amp; alokasi bandwidth pada 900/1800 MHz di wilayah 3T Indonesia.
+        </p>
+        <p class="brand-team">
+          <strong>Kelompok 1</strong> · Sistem Komunikasi Digital (2026) · Aditya, Zahran, Baihaqy, Jeyd, Rizqul, Yusril
+        </p>
       </div>
 
       <nav class="main-nav" role="tablist" aria-label="Navigasi Halaman RuralLink">
@@ -61,13 +47,13 @@
               Preset: pemulihan tepi sel
             </button>
             <p class="control-hint">
-              900 MHz NLOS, 5,0 km, 23 dBm, S3, BER 10⁻². Baseline S0 mengalami outage di jarak ini.
+              900 MHz NLOS, 5 km, 23 dBm, S3 (baseline S0 outage).
             </p>
           </div>
 
           <div class="control-group">
             <div class="control-label">
-              <span>Frekuensi Pembawa (MHz)</span>
+              <span>Frekuensi Pembawa</span>
               <span class="val-readout" id="lblFreq">900 MHz</span>
             </div>
             <div class="segmented" role="group" aria-label="Pilih Frekuensi Pembawa">
@@ -76,20 +62,20 @@
               <button type="button" class="seg-btn" data-freq="1800" aria-pressed="false">1800 MHz</button>
             </div>
             <p class="control-hint">
-              Riset utama: 900 &amp; 1800 MHz. Suplemen sensitivitas: 700 MHz (model CI Park 2023).
+              Utama: 900/1800 MHz · Suplemen: 700 MHz (eksploratori).
             </p>
           </div>
 
           <div class="control-group">
             <div class="control-label">
-              <span>Kondisi Propagasi CI</span>
+              <span>Propagasi CI</span>
               <span class="val-readout" id="lblEnv">NLOS</span>
             </div>
             <div class="segmented two-col" role="group" aria-label="Pilih Lingkungan Propagasi">
               <button type="button" class="seg-btn" data-env="LOS" aria-pressed="false">LOS (n=2,16)</button>
               <button type="button" class="seg-btn active" data-env="NLOS" aria-pressed="true">NLOS (n=2,56)</button>
             </div>
-            <p class="control-hint" id="hintEnv">NLOS standar Park (2023): n = 2,56; σ = 11,40 dB.</p>
+            <p class="control-hint" id="hintEnv">Park (2023): n = 2,56 · σ = 11,40 dB.</p>
           </div>
 
           <div class="control-group">
@@ -200,10 +186,10 @@
               <input type="checkbox" id="chkLiveMc" checked />
             </label>
             <p class="control-hint">
-              Saat aktif, perubahan parameter otomatis menghitung ulang Monte Carlo setelah interaksi stabil.
+              Otomatis hitung ulang saat parameter stabil.
             </p>
             <p class="notice-bar warn" id="mcSmallSampleWarn" hidden>
-              Sampel kecil memiliki ketidakpastian statistik tinggi (interval kepercayaan lebar dan berpeluang 0 error pada BER rendah).
+              Sampel kecil memiliki ketidakpastian statistik tinggi (CI lebar).
             </p>
           </div>
 
@@ -245,9 +231,7 @@
         </aside>
 
         <div class="main-stage">
-          <div class="notice-bar status-slot" id="workbenchStatusBar" role="status" aria-live="polite">
-            Status link: memuat konfigurasi awal...
-          </div>
+          <div class="notice-bar error" id="apiErrorBanner" hidden role="alert"></div>
 
           <div class="telemetry-strip" aria-label="Telemetry Link Uplink">
             <div class="telemetry-cell">
@@ -256,14 +240,14 @@
               <div class="t-sub" id="kpiPlSub">THEORETICAL</div>
             </div>
             <div class="telemetry-cell">
-              <div class="t-label">Daya Terima Pr</div>
+              <div class="t-label">Daya Terima</div>
               <div class="t-value" id="kpiPr">-</div>
               <div class="t-sub" id="kpiPrSub">P/RB</div>
             </div>
             <div class="telemetry-cell">
               <div class="t-label">Noise Floor</div>
               <div class="t-value" id="kpiNoise">-</div>
-              <div class="t-sub" id="kpiNoiseSub">B_active</div>
+              <div class="t-sub" id="kpiNoiseSub">BW aktif</div>
             </div>
             <div class="telemetry-cell">
               <div class="t-label">SNR (Es/N0)</div>
@@ -271,7 +255,7 @@
               <div class="t-sub" id="kpiSnrSub">Eb/N0</div>
             </div>
             <div class="telemetry-cell">
-              <div class="t-label">Konfigurasi Aktif</div>
+              <div class="t-label">Konfigurasi</div>
               <div class="t-value" id="kpiMod">-</div>
               <div class="t-sub" id="kpiModSub">Strategi</div>
             </div>
@@ -283,10 +267,10 @@
             <div class="telemetry-cell">
               <div class="t-label">Laju Nominal</div>
               <div class="t-value" id="kpiRate">-</div>
-              <div class="t-sub" id="kpiRateSub">tanpa coding (bukan LTE)</div>
+              <div class="t-sub" id="kpiRateSub">Uncoded</div>
             </div>
             <div class="telemetry-cell">
-              <div class="t-label">Probabilitas Outage</div>
+              <div class="t-label">Outage</div>
               <div class="t-value sim" id="kpiOutage">-</div>
               <div class="t-sub" id="kpiOutageSub">SIMULATED</div>
             </div>
@@ -295,10 +279,9 @@
           <div class="charts-grid">
             <article class="panel chart-panel">
               <div class="chart-head">
-                <h2 id="snrChartTitle">Kurva SNR terhadap Jarak (700 / 900 / 1800 MHz, THEORETICAL)</h2>
-                <span class="status-pill" id="snrUpdateStatus">Siap · Seret titik</span>
+                <h2 id="snrChartTitle">Kurva SNR vs Jarak (THEORETICAL)</h2>
               </div>
-              <span class="chart-note">Garis penuh: 1 RB · Putus pendek: 25 RB · Garis horizontal: ambang Es/N0 Cho &amp; Yoon · Titik kuning: geser jarak (1–12 km)</span>
+              <span class="chart-note">Garis penuh: 1 RB · Putus: 25 RB · Titik kuning: geser jarak (1–12 km)</span>
               <canvas id="cvSnr" width="660" height="310" aria-label="Grafik interaktif SNR terhadap jarak; geser titik aktif untuk mengubah jarak"></canvas>
             </article>
 

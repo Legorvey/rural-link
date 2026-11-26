@@ -157,8 +157,8 @@
     document.getElementById("lblEnv").textContent = state.env;
     document.getElementById("hintEnv").textContent =
       state.env === "LOS"
-        ? "LOS standar Park (2023): n = 2,16; σ = 3,07 dB."
-        : "NLOS standar Park (2023): n = 2,56; σ = 11,40 dB.";
+        ? "Park (2023): n = 2,16 · σ = 3,07 dB."
+        : "Park (2023): n = 2,56 · σ = 11,40 dB.";
     document.getElementById("lblShadow").textContent =
       state.shadow === "median" ? "Median" : "Margin 95%";
     document.getElementById("lblChannel").textContent =
@@ -168,13 +168,12 @@
     document.getElementById("lblTargetBer").textContent =
       state.ber_target === 0.001 ? "10⁻³" : "10⁻²";
     document.getElementById("hintStrat").textContent = manual
-      ? "Mode manual: RB dan modulasi di bawah dikunci pengguna."
-      : "Mode adaptif: optimizer memilih modulasi dan RB.";
+      ? "Mode manual: RB dan modulasi dikunci."
+      : "Mode adaptif: optimizer memilih modulasi & RB.";
     document.getElementById("lblRbManual").textContent = `${state.rb_manual} RB`;
     document.getElementById("lblModManual").textContent = state.mod_manual;
     document.getElementById("lblMcBits").textContent = MC_BIT_LABELS[state.n_bits] || `${state.n_bits}`;
     document.getElementById("mcSmallSampleWarn").hidden = state.n_bits >= 100000;
-    updateWorkbenchStatusBar();
   }
 
   function setupCanvas(id, logicalW, logicalH) {
@@ -192,51 +191,21 @@
     return { ctx, W: logicalW, H: logicalH };
   }
 
-  function updateWorkbenchStatusBar() {
-    const bar = document.getElementById("workbenchStatusBar");
-    if (!bar) return;
-
-    if (workbenchApiError) {
-      bar.className = "notice-bar error status-slot";
-      bar.textContent = workbenchApiError;
-      return;
-    }
-
-    const act = lastOpData && lastOpData.active;
-    if (act && !act.ok) {
-      if (state.strategy === "MANUAL" && act.mod !== "Outage") {
-        bar.className = "notice-bar warn status-slot";
-        bar.textContent = `Outage manual: Eb/N0 ${fmtIdNum(act.ebn0_db, 1)} dB < ambang ${fmtIdNum(act.ebn0_threshold_db, 2)} dB (${act.mod}, BER ${state.ber_target}).`;
-      } else {
-        bar.className = "notice-bar error status-slot";
-        bar.textContent = `Outage pada ${fmtIdNum(state.dist_km, 2)} km (${state.freq_mhz} MHz ${state.env}): tidak ada kombinasi modulasi dan RB yang memenuhi BER ${state.ber_target}.`;
-      }
-      return;
-    }
-
-    if (state.freq_mhz === 700 || state.ber_target !== 0.01) {
-      bar.className = "notice-bar warn status-slot";
-      bar.textContent = `Suplemen sensitivitas (${state.freq_mhz} MHz, BER ${state.ber_target}) di luar riset utama 900/1800 MHz BER 1e-2 (Tab Hasil Penelitian tetap).`;
-      return;
-    }
-
-    bar.className = "notice-bar status-slot";
-    if (act) {
-      bar.textContent = `Status link: Aktif · ${act.mod} × ${act.rb} RB (${state.freq_mhz} MHz ${state.env}, ${fmtIdNum(state.dist_km, 2)} km).`;
-    } else {
-      bar.textContent = "Status link: memuat konfigurasi awal...";
-    }
-  }
-
   function showWorkbenchError(msg) {
     workbenchApiError = msg;
-    updateWorkbenchStatusBar();
+    const bar = document.getElementById("apiErrorBanner");
+    if (!bar) return;
+    bar.hidden = false;
+    bar.textContent = workbenchApiError;
   }
 
   function clearWorkbenchError() {
     if (!workbenchApiError) return;
     workbenchApiError = "";
-    updateWorkbenchStatusBar();
+    const bar = document.getElementById("apiErrorBanner");
+    if (!bar) return;
+    bar.hidden = true;
+    bar.textContent = "";
   }
 
   async function fetchJson(url, options) {
@@ -266,15 +235,15 @@
       document.getElementById("kpiBerLabel").textContent = "BER AWGN (Teori)";
       document.getElementById("kpiBer").textContent =
         inOutage || act.ber_awgn === null ? "n/a" : act.ber_awgn.toExponential(2);
-      document.getElementById("kpiBerSub").textContent = `target ≤ ${state.ber_target}`;
+      document.getElementById("kpiBerSub").textContent = `Target ≤ ${state.ber_target}`;
       return;
     }
 
     if (state.strategy === "MANUAL") {
-      document.getElementById("kpiBerLabel").textContent = "BER Rayleigh (tanpa CSI)";
+      document.getElementById("kpiBerLabel").textContent = "BER Rayleigh";
       document.getElementById("kpiBer").textContent =
         inOutage || act.ber_rayleigh === null ? "n/a" : act.ber_rayleigh.toExponential(2);
-      document.getElementById("kpiBerSub").textContent = "rata-rata tanpa CSI (manual)";
+      document.getElementById("kpiBerSub").textContent = "Tanpa CSI (manual)";
       return;
     }
 
@@ -284,10 +253,10 @@
       typeof lastStochDistData.active_outage.fading_cond_ber_mean === "number"
         ? lastStochDistData.active_outage.fading_cond_ber_mean
         : null;
-    document.getElementById("kpiBerLabel").textContent = "BER Bersyarat (CSI)";
+    document.getElementById("kpiBerLabel").textContent = "BER CSI";
     document.getElementById("kpiBer").textContent =
       condBer === null ? "n/a" : condBer.toExponential(2);
-    document.getElementById("kpiBerSub").textContent = `CSI adaptif ≤ ${state.ber_target} (SIMULATED)`;
+    document.getElementById("kpiBerSub").textContent = `Adaptif ≤ ${state.ber_target} · SIMULATED`;
   }
 
   function renderOperatingPoint(data) {
@@ -296,39 +265,40 @@
     const inOutage = !act.ok;
 
     document.getElementById("kpiPl").textContent = `${fmtIdNum(act.pl_db, 1)} dB`;
-    document.getElementById("kpiPlSub").textContent = `margin ${fmtIdNum(act.margin_db, 1)} dB (THEORETICAL)`;
+    document.getElementById("kpiPlSub").textContent = `Margin ${fmtIdNum(act.margin_db, 1)} dB · THEORETICAL`;
     document.getElementById("kpiPr").textContent = `${fmtIdNum(act.pr_dbm, 1)} dBm`;
     document.getElementById("kpiPrSub").textContent = `P/RB ${fmtIdNum(act.p_rb_dbm, 1)} dBm`;
     document.getElementById("kpiNoise").textContent = `${fmtIdNum(act.noise_dbm, 1)} dBm`;
-    document.getElementById("kpiNoiseSub").textContent = `B ${fmtIdNum(act.b_hz / 1e6, 2)} MHz`;
+    document.getElementById("kpiNoiseSub").textContent = `BW ${fmtIdNum(act.b_hz / 1e6, 2)} MHz`;
 
     const snrEl = document.getElementById("kpiSnr");
     snrEl.textContent = `${fmtIdNum(act.snr_db, 1)} dB`;
     snrEl.className = `t-value${inOutage ? " bad" : ""}`;
     document.getElementById("kpiSnrSub").textContent = inOutage
-      ? "tanpa opsi layak"
+      ? "Di bawah ambang"
       : `Eb/N0 ${fmtIdNum(act.ebn0_db, 1)} dB`;
 
     const modEl = document.getElementById("kpiMod");
     modEl.textContent = inOutage ? "Outage" : `${act.mod} × ${act.rb} RB`;
     modEl.className = `t-value${inOutage ? " bad" : ""}`;
     document.getElementById("kpiModSub").textContent =
-      state.strategy === "MANUAL" ? "manual" : `optimizer (${state.strategy})`;
+      state.strategy === "MANUAL" ? "Manual" : `Strategi ${state.strategy}`;
 
     updateTelemetryBer();
 
     document.getElementById("kpiRate").textContent = inOutage
-      ? "outage"
+      ? "Outage"
       : `${fmtIdNum(act.rate_mbps, 2)} Mbit/s`;
     document.getElementById("kpiRateSub").textContent = inOutage
-      ? "tanpa transmisi"
-      : `Shannon ${fmtIdNum(act.shannon_mbps, 2)} Mbit/s`;
-
-    updateWorkbenchStatusBar();
+      ? "Tanpa transmisi"
+      : `Uncoded · Shannon ${fmtIdNum(act.shannon_mbps, 2)}`;
 
     const base = data.baseline_s0;
-    document.getElementById("mcPairSummary").textContent =
-      `Aktif: ${inOutage ? "Outage" : `${act.mod} × ${act.rb} RB`} | S0: ${base.ok ? "QPSK × 25 RB" : "Outage"}`;
+    const pairEl = document.getElementById("mcPairSummary");
+    if (pairEl) {
+      pairEl.textContent =
+        `Aktif: ${inOutage ? "Outage" : `${act.mod} × ${act.rb} RB`} | S0: ${base.ok ? "QPSK × 25 RB" : "Outage"}`;
+    }
     document.getElementById("btnRunMc").disabled = inOutage;
 
     data.by_freq.forEach((item) => {
@@ -339,11 +309,11 @@
     });
 
     document.getElementById("snrChartTitle").textContent =
-      `Kurva SNR terhadap Jarak (${state.env}, margin ${fmtIdNum(act.margin_db, 1)} dB, THEORETICAL)`;
+      `Kurva SNR vs Jarak (${state.env} · THEORETICAL)`;
     document.getElementById("freqTableTitle").textContent =
-      `Perbandingan Frekuensi pada ${fmtIdNum(state.dist_km, 2)} km (${state.env})`;
+      `Perbandingan Frekuensi (${fmtIdNum(state.dist_km, 2)} km · ${state.env})`;
     document.getElementById("stratTableTitle").textContent =
-      `Fixed vs Adaptif pada ${fmtIdNum(state.dist_km, 2)} km (${state.freq_mhz} MHz ${state.env})`;
+      `Perbandingan Strategi (${fmtIdNum(state.dist_km, 2)} km · ${state.freq_mhz} MHz ${state.env})`;
 
     drawSnrChart(data);
     renderFreqComparisonTable(data, lastZonesData);
@@ -376,7 +346,7 @@
           : data.active_outage.fading_outage_prob;
       document.getElementById("kpiOutage").textContent = `${fmtIdNum(prob * 100, 1)}%`;
       document.getElementById("kpiOutageSub").textContent =
-        state.channel === "AWGN" ? "SIMULATED, shadowing" : "SIMULATED, +Rayleigh CSI";
+        state.channel === "AWGN" ? "Shadowing · SIMULATED" : "+Rayleigh CSI · SIMULATED";
     }
 
     updateTelemetryBer();
@@ -917,7 +887,6 @@
       ++opSeq;
       if (opController) opController.abort();
       clearWorkbenchError();
-      setStatusPill("snrUpdateStatus", "Siap · Seret titik", false);
       renderOperatingPoint(opCache.get(key));
       return opCache.get(key);
     }
@@ -925,7 +894,6 @@
     const seq = ++opSeq;
     if (opController) opController.abort();
     opController = new AbortController();
-    setStatusPill("snrUpdateStatus", "Memperbarui...", true);
 
     try {
       const data = await fetchJson("/api/operating-point", {
@@ -937,12 +905,10 @@
       if (seq !== opSeq) return null;
       opCache.set(key, data);
       clearWorkbenchError();
-      setStatusPill("snrUpdateStatus", "Siap · Seret titik", false);
       renderOperatingPoint(data);
       return data;
     } catch (err) {
       if (err.name === "AbortError" || seq !== opSeq) return null;
-      setStatusPill("snrUpdateStatus", "Gagal memuat", false);
       clearTelemetryOnError();
       showWorkbenchError(`Gagal memuat titik operasi dari API Python: ${err.message}`);
       return null;
