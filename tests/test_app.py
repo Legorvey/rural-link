@@ -48,7 +48,7 @@ def test_default_render_single_page_workbench_and_tabs():
     assert len(at.get("plotly_chart")) == 4
     assert len(at.dataframe) >= 4
     assert not at.error
-    assert list(at.sidebar.segmented_control(key="freq").options) == ["700* (supl.)", "900", "1800"]
+    assert list(at.sidebar.segmented_control(key="freq").options) == ["700", "900", "1800"]
     assert list(at.sidebar.segmented_control(key="ber_target").options) == [
         "10⁻² (Primer)",
         "10⁻³ (Eksploratori)",
@@ -142,9 +142,9 @@ def test_direct_sidebar_700mhz_and_ber_1e3():
     at.sidebar.segmented_control(key="freq").set_value(700.0)
     at.sidebar.segmented_control(key="ber_target").set_value(1e-3)
     _run(at)
-    text = _md(at)
-    assert "Mode sensitivitas eksploratori aktif" in text
-    assert "bukan replikasi Reddy" in text
+    captions = " ".join(c.value for c in at.caption)
+    assert "Catatan suplemen:" in captions
+    assert "900/1800 MHz pada BER 1e-2" in captions
     assert at.session_state["freq"] == 700.0
     assert not at.error
 

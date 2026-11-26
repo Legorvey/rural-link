@@ -167,7 +167,7 @@ def read_csv(name: str) -> pd.DataFrame | None:
 
 
 def freq_tag(freq_mhz: float) -> str:
-    return f"{freq_mhz:.0f} MHz (eksploratori)" if freq_mhz == 700.0 else f"{freq_mhz:.0f} MHz"
+    return f"{freq_mhz:.0f} MHz"
 
 
 def align_mc_bits(n_bits: int, modulation: str) -> int:
@@ -311,10 +311,10 @@ with st.sidebar:
         "Frekuensi pembawa (MHz)",
         list(FREQ_OPTIONS),
         "freq",
-        fmt=lambda x: "700* (supl.)" if x == 700.0 else f"{x:.0f}",
+        fmt=lambda x: f"{x:.0f}",
     )
     st.caption(
-        "Primer: 900 & 1800 MHz. *700 MHz: suplemen eksploratori (terinspirasi Reddy 2022 di atas model CI Park 2023)."
+        "Riset utama: 900 & 1800 MHz. Suplemen sensitivitas: 700 MHz (terinspirasi Reddy 2022 di atas model CI Park 2023)."
     )
     env = seg("Lingkungan propagasi", ["LOS", "NLOS"], "env")
     shadow = seg(
@@ -401,7 +401,7 @@ def build_snr_figure(
     off = active_link["margin"]
     for f in freqs:
         color = FREQ_COLOR[f]
-        label_prefix = "700 MHz*" if f == 700.0 else f"{f:.0f} MHz"
+        label_prefix = f"{f:.0f} MHz"
         for rb, dash in ((1, "solid"), (25, "dot")):
             pl_d = np.asarray(median_path_loss_db(DISTANCES_KM * 1000.0, f, env), dtype=float) + off
             snr_d = np.atleast_1d(compute_link_budget(pl_d, n_rb=rb, tx_power_dbm=ptx).snr_db)
@@ -670,12 +670,9 @@ def build_coverage_figure(
 # ================================================================== A. INTERACTIVE WORKBENCH
 with tab_wb:
     if is_exploratory:
-        st.markdown(
-            '<div class="rl-note rl-note-exp"><b>Mode sensitivitas eksploratori aktif.</b> '
-            f"Frekuensi aktif: {', '.join(f'{f:.0f}' for f in freq_options)} MHz; target BER: {ber_target:g}. "
-            "700 MHz terinspirasi Reddy (2022) di atas model CI Park (2023) dan bukan replikasi Reddy. "
-            "Konfigurasi riset utama tetap 900/1800 MHz pada BER 1e-2 (Tab B tidak berubah).</div>",
-            unsafe_allow_html=True,
+        st.caption(
+            f"Catatan suplemen: konfigurasi aktif ({freq:.0f} MHz, BER {ber_target:g}) termasuk "
+            "analisis sensitivitas tambahan di luar riset utama 900/1800 MHz pada BER 1e-2 (Tab B tetap)."
         )
 
     row = curves[
