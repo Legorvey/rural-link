@@ -119,6 +119,7 @@ class StochasticRequest(BaseModel):
     ber_target: float = Field(default=1e-2)
     active_strategy: Literal["S0", "S1", "S2", "S3", "R0", "MANUAL"] = "S3"
     zone_strategy: Literal["S0", "S1", "S2", "S3", "R0"] = "S3"
+    include_zones: bool = True
 
     @field_validator("ber_target")
     @classmethod
@@ -130,9 +131,11 @@ class StochasticRequest(BaseModel):
 
 
 class MonteCarloRequest(WorkbenchRequest):
-    """Validated parameters for explicit bit-level Monte Carlo execution."""
+    """Validated parameters for explicit or live bit-level Monte Carlo execution."""
 
     n_bits: int = Field(default=100_000, ge=100, le=1_000_000)
+    mode: Literal["all", "opt_vs_s0", "by_freq"] = "all"
+    is_preview: bool = False
 
     @field_validator("n_bits")
     @classmethod
@@ -494,22 +497,23 @@ def api_stochastic_analysis(req: StochasticRequest) -> dict:
             if int(f) == req.freq_mhz:
                 active_curves_df = curves_df
 
-            srow_z = summary_df[
-                (summary_df.freq_mhz == f) & (summary_df.scenario == req.zone_strategy)
-            ].iloc[0]
-            zones.append(
-                {
-                    "freq_mhz": int(f),
-                    "scenario": req.zone_strategy,
-                    "rings": _build_radial_rings(curves_df, f, req.zone_strategy),
-                    "radius_median_km": float(srow_z["radius_median_km"]),
-                    "radius_median_label": str(srow_z["radius_median_label"]),
-                    "radius_stochastic_km": float(srow_z["radius_stochastic_km"]),
-                    "radius_stochastic_label": str(srow_z["radius_stochastic_label"]),
-                    "radius_fading_km": float(srow_z["radius_fading_km"]),
-                    "radius_fading_label": str(srow_z["radius_fading_label"]),
-                }
-            )
+            if req.include_zones:
+                srow_z = summary_df[
+                    (summary_df.freq_mhz == f) & (summary_df.scenario == req.zone_strategy)
+                ].iloc[0]
+                zones.append(
+                    {
+                        "freq_mhz": int(f),
+                        "scenario": req.zone_strategy,
+                        "rings": _build_radial_rings(curves_df, f, req.zone_strategy),
+                        "radius_median_km": float(srow_z["radius_median_km"]),
+                        "radius_median_label": str(srow_z["radius_median_label"]),
+                        "radius_stochastic_km": float(srow_z["radius_stochastic_km"]),
+                        "radius_stochastic_label": str(srow_z["radius_stochastic_label"]),
+                        "radius_fading_km": float(srow_z["radius_fading_km"]),
+                        "radius_fading_label": str(srow_z["radius_fading_label"]),
+                    }
+                )
             srow_s3 = summary_df[(summary_df.freq_mhz == f) & (summary_df.scenario == "S3")].iloc[0]
             freq_summary_s3.append(
                 {
@@ -543,6 +547,7 @@ def api_stochastic_analysis(req: StochasticRequest) -> dict:
                         "shadow_outage_prob": row["shadow_outage_prob"],
                         "fading_outage_prob": row["fading_outage_prob"],
                         "fading_effective_rate_mbps": row["fading_effective_rate_mbps"],
+                        "fading_cond_ber_mean": row["fading_cond_ber_mean"],
                     }
                     break
 
@@ -551,7 +556,7 @@ def api_stochastic_analysis(req: StochasticRequest) -> dict:
             "seed": cfg.default_seed,
             "outage_target": cfg.outage_target,
             "active_outage": active_outage,
-            "zones": zones,
+            "zones": zones if req.include_zones else None,
             "strategy_comparison": strategy_rows,
             "freq_summary_s3": freq_summary_s3,
         }
@@ -602,29 +607,32 @@ def api_monte_carlo(req: MonteCarloRequest) -> dict:
             base_mc = _cached_mc(base_s0["mod"], round(float(base_s0["ebn0_db"]), 6), base_bits)
 
         by_freq: dict[str, dict | None] = {}
-        freq_strat = "S3" if req.strategy == "MANUAL" else req.strategy
-        for f in FREQ_OPTIONS:
-            lk_f = evaluate_link(
-                f,
-                req.env,
-                req.dist_km,
-                req.tx_power_dbm,
-                req.shadow,
-                freq_strat,
-                req.rb_manual,
-                req.mod_manual,
-                req.ber_target,
-            )
-            if lk_f["ok"]:
-                f_bits = align_mc_bits(req.n_bits, lk_f["mod"])
-                by_freq[str(int(f))] = _cached_mc(
-                    lk_f["mod"], round(float(lk_f["ebn0_db"]), 6), f_bits
+        if req.mode in ("all", "by_freq"):
+            freq_strat = "S3" if req.strategy == "MANUAL" else req.strategy
+            for f in FREQ_OPTIONS:
+                lk_f = evaluate_link(
+                    f,
+                    req.env,
+                    req.dist_km,
+                    req.tx_power_dbm,
+                    req.shadow,
+                    freq_strat,
+                    req.rb_manual,
+                    req.mod_manual,
+                    req.ber_target,
                 )
-            else:
-                by_freq[str(int(f))] = None
+                if lk_f["ok"]:
+                    f_bits = align_mc_bits(req.n_bits, lk_f["mod"])
+                    by_freq[str(int(f))] = _cached_mc(
+                        lk_f["mod"], round(float(lk_f["ebn0_db"]), 6), f_bits
+                    )
+                else:
+                    by_freq[str(int(f))] = None
 
         return {
             "requested_bits": req.n_bits,
+            "is_preview": req.is_preview,
+            "mode": req.mode,
             "seed": CFG.default_seed,
             "opt": opt_mc,
             "base": base_mc,

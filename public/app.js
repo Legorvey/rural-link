@@ -28,6 +28,11 @@
     1000000: "10⁶ (1.000.000)",
   };
 
+  const SNR_W = 660;
+  const SNR_H = 310;
+  const SNR_PAD = { l: 52, r: 22, t: 18, b: 40 };
+  const PREVIEW_MAX_BITS = 10000;
+
   const DEFAULTS = {
     freq_mhz: 900,
     env: "NLOS",
@@ -42,37 +47,53 @@
     n_bits: 100000,
     zone_strategy: "S3",
     mc_view: "opt_vs_s0",
+    live_mc: true,
   };
 
   const state = { ...DEFAULTS };
-  let activeTab = "workbench";
   let lastOpData = null;
-  let lastStochData = null;
+  let lastZonesData = null; // distance-independent radial zones + S3 radius summary
+  let lastStochDistData = null; // distance-dependent outage + strategy table
   let mcResult = null;
-  let mcKey = null;
+  let mcResultKey = null;
+  let mcStatusMode = "idle"; // idle | loading | ready | stale | error | outage
+
   let resultsData = null;
   let resultsEnv = "NLOS";
-  let resultsStrategies = new Set(["S0", "S1", "S2", "S3", "R0"]);
+  const resultsStrategies = new Set(["S0", "S1", "S2", "S3", "R0"]);
   let methodologyLoaded = false;
   let glossaryCache = null;
 
   const opCache = new Map();
-  const stochCache = new Map();
+  const zoneCache = new Map();
+  const stochDistCache = new Map();
+  const mcCache = new Map();
+
+  let opSeq = 0;
+  let stochSeq = 0;
+  let mcSeq = 0;
+  let workbenchSeq = 0;
   let opController = null;
   let stochController = null;
   let mcController = null;
-  let sliderDebounceTimer = null;
+  let mcInFlight = false;
+
+  let analyticalTimer = null;
+  let mcSettleTimer = null;
+  let mcDragThrottleAt = 0;
+  let dragRafId = null;
+  let isDraggingSnr = false;
+  let activePointerId = null;
 
   function fmtIdNum(val, decimals) {
     return Number(val).toFixed(decimals).replace(".", ",");
   }
 
-  function currentParamKey() {
+  function currentMcParamKey() {
     return JSON.stringify({
       f: state.freq_mhz,
       e: state.env,
       s: state.shadow,
-      c: state.channel,
       d: state.dist_km,
       p: state.tx_power_dbm,
       b: state.ber_target,
@@ -81,6 +102,22 @@
       mod: state.mod_manual,
       nb: state.n_bits,
     });
+  }
+
+  function currentZoneKey() {
+    return JSON.stringify({
+      e: state.env,
+      p: state.tx_power_dbm,
+      b: state.ber_target,
+      zs: state.zone_strategy,
+    });
+  }
+
+  function setStatusPill(id, text, updating) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("updating", Boolean(updating));
   }
 
   function setActiveSegment(attr, value) {
@@ -106,6 +143,7 @@
     document.getElementById("rngPt").value = String(state.tx_power_dbm);
     document.getElementById("selStrat").value = state.strategy;
     document.getElementById("selZoneStrat").value = state.zone_strategy;
+    document.getElementById("chkLiveMc").checked = Boolean(state.live_mc);
 
     const manual = state.strategy === "MANUAL";
     document.querySelectorAll("[data-rb], [data-mod]").forEach((btn) => {
@@ -175,9 +213,7 @@
       try {
         const body = await resp.json();
         if (body && body.detail) detail = body.detail;
-      } catch (_) {
-        // ignore JSON parse failure
-      }
+      } catch (_) {}
       throw new Error(detail);
     }
     return resp.json();
@@ -187,6 +223,38 @@
     ["kpiPl", "kpiPr", "kpiNoise", "kpiSnr", "kpiMod", "kpiBer", "kpiRate", "kpiOutage"].forEach((id) => {
       document.getElementById(id).textContent = "-";
     });
+  }
+
+  function updateTelemetryBer() {
+    if (!lastOpData) return;
+    const act = lastOpData.active;
+    const inOutage = !act.ok;
+    if (state.channel === "AWGN") {
+      document.getElementById("kpiBerLabel").textContent = "BER AWGN (Teori)";
+      document.getElementById("kpiBer").textContent =
+        inOutage || act.ber_awgn === null ? "n/a" : act.ber_awgn.toExponential(2);
+      document.getElementById("kpiBerSub").textContent = `target ≤ ${state.ber_target}`;
+      return;
+    }
+
+    if (state.strategy === "MANUAL") {
+      document.getElementById("kpiBerLabel").textContent = "BER Rayleigh (tanpa CSI)";
+      document.getElementById("kpiBer").textContent =
+        inOutage || act.ber_rayleigh === null ? "n/a" : act.ber_rayleigh.toExponential(2);
+      document.getElementById("kpiBerSub").textContent = "rata-rata tanpa CSI (manual)";
+      return;
+    }
+
+    const condBer =
+      lastStochDistData &&
+      lastStochDistData.active_outage &&
+      typeof lastStochDistData.active_outage.fading_cond_ber_mean === "number"
+        ? lastStochDistData.active_outage.fading_cond_ber_mean
+        : null;
+    document.getElementById("kpiBerLabel").textContent = "BER Bersyarat (CSI)";
+    document.getElementById("kpiBer").textContent =
+      condBer === null ? "n/a" : condBer.toExponential(2);
+    document.getElementById("kpiBerSub").textContent = `CSI adaptif ≤ ${state.ber_target} (SIMULATED)`;
   }
 
   function renderOperatingPoint(data) {
@@ -214,12 +282,7 @@
     document.getElementById("kpiModSub").textContent =
       state.strategy === "MANUAL" ? "manual" : `optimizer (${state.strategy})`;
 
-    document.getElementById("kpiBerLabel").textContent =
-      state.channel === "AWGN" ? "BER AWGN" : "BER Rayleigh (tanpa CSI)";
-    const berVal = state.channel === "AWGN" ? act.ber_awgn : act.ber_rayleigh;
-    document.getElementById("kpiBer").textContent =
-      inOutage || berVal === null ? "n/a" : berVal.toExponential(2);
-    document.getElementById("kpiBerSub").textContent = `target ${state.ber_target}`;
+    updateTelemetryBer();
 
     document.getElementById("kpiRate").textContent = inOutage
       ? "outage"
@@ -245,9 +308,7 @@
     const base = data.baseline_s0;
     document.getElementById("mcPairSummary").textContent =
       `Aktif: ${inOutage ? "Outage" : `${act.mod} × ${act.rb} RB`} | S0: ${base.ok ? "QPSK × 25 RB" : "Outage"}`;
-
-    const runBtn = document.getElementById("btnRunMc");
-    runBtn.disabled = inOutage;
+    document.getElementById("btnRunMc").disabled = inOutage;
 
     data.by_freq.forEach((item) => {
       const f = item.freq_mhz;
@@ -264,12 +325,26 @@
       `Fixed vs Adaptif pada ${fmtIdNum(state.dist_km, 2)} km (${state.freq_mhz} MHz ${state.env})`;
 
     drawSnrChart(data);
-    renderFreqComparisonTable(data, lastStochData);
-    updateMcStateUI();
+    renderFreqComparisonTable(data, lastZonesData);
   }
 
-  function renderStochastic(data) {
-    lastStochData = data;
+  function renderStochastic(data, zoneKey) {
+    if (data.zones) {
+      lastZonesData = {
+        zones: data.zones,
+        freq_summary_s3: data.freq_summary_s3,
+      };
+      zoneCache.set(zoneKey, lastZonesData);
+    } else if (zoneCache.has(zoneKey)) {
+      lastZonesData = zoneCache.get(zoneKey);
+    }
+
+    lastStochDistData = {
+      active_outage: data.active_outage,
+      strategy_comparison: data.strategy_comparison,
+      freq_summary_s3: data.freq_summary_s3,
+    };
+
     if (state.strategy === "MANUAL" || !data.active_outage) {
       document.getElementById("kpiOutage").textContent = "n/a";
       document.getElementById("kpiOutageSub").textContent = "mode manual";
@@ -283,13 +358,16 @@
         state.channel === "AWGN" ? "SIMULATED, shadowing" : "SIMULATED, +Rayleigh CSI";
     }
 
-    data.freq_summary_s3.forEach((item) => {
+    updateTelemetryBer();
+
+    const s3Summary = (lastZonesData && lastZonesData.freq_summary_s3) || data.freq_summary_s3 || [];
+    s3Summary.forEach((item) => {
       document.getElementById(`cmpCov${item.freq_mhz}`).textContent = item.radius_fading_label;
     });
 
-    drawCoverageMap(data);
+    if (lastZonesData) drawCoverageMap(lastZonesData);
     renderStrategyTable(data);
-    if (lastOpData) renderFreqComparisonTable(lastOpData, data);
+    if (lastOpData) renderFreqComparisonTable(lastOpData, lastZonesData);
   }
 
   function renderStrategyTable(stochData) {
@@ -311,11 +389,11 @@
       .join("");
   }
 
-  function renderFreqComparisonTable(opData, stochData) {
+  function renderFreqComparisonTable(opData, zoneData) {
     const tbody = document.querySelector("#tblFreqCmp tbody");
     const radMap = new Map();
-    if (stochData && stochData.freq_summary_s3) {
-      stochData.freq_summary_s3.forEach((r) => radMap.set(r.freq_mhz, r));
+    if (zoneData && zoneData.freq_summary_s3) {
+      zoneData.freq_summary_s3.forEach((r) => radMap.set(r.freq_mhz, r));
     }
     tbody.innerHTML = opData.by_freq
       .map((item) => {
@@ -337,9 +415,32 @@
       .join("");
   }
 
+  function lookupSnrOnCachedCurves(opData, freqMhz, rb, distKm) {
+    if (!opData || !opData.snr_curves || !opData.distances_km) return opData ? opData.active.snr_db : 0;
+    const curves = opData.snr_curves[String(freqMhz)];
+    if (!curves) return opData.active.snr_db;
+    let series = curves.rb_1;
+    if (rb === 25) series = curves.rb_25;
+    else if (rb !== 1 && curves.rb_active) series = curves.rb_active;
+    else if (rb !== 1 && Math.abs(distKm - opData.active.dist_km) < 1e-6) return opData.active.snr_db;
+
+    const dists = opData.distances_km;
+    let bestIdx = 0;
+    let bestDiff = Infinity;
+    for (let i = 0; i < dists.length; i += 1) {
+      const diff = Math.abs(dists[i] - distKm);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestIdx = i;
+      }
+    }
+    return series[bestIdx];
+  }
+
   function drawSnrChart(data) {
-    const { ctx, W, H } = setupCanvas("cvSnr", 660, 310);
-    const pad = { l: 52, r: 22, t: 18, b: 40 };
+    if (!data) return;
+    const { ctx, W, H } = setupCanvas("cvSnr", SNR_W, SNR_H);
+    const pad = SNR_PAD;
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
 
@@ -380,7 +481,6 @@
       ctx.fillText(`${d} km`, px, H - 18);
     }
 
-    // Cho-Yoon Es/N0 thresholds
     ["QPSK", "16-QAM", "64-QAM"].forEach((mod) => {
       const th = data.thresholds[mod];
       if (!th) return;
@@ -427,7 +527,7 @@
       }
     });
 
-    // Active distance cursor & operating point
+    // Active distance cursor & draggable yellow operating-point marker
     const cx = xToPx(state.dist_km);
     ctx.save();
     ctx.setLineDash([5, 4]);
@@ -439,14 +539,33 @@
     ctx.stroke();
     ctx.restore();
 
-    const pyAct = yToPx(data.active.snr_db);
-    ctx.fillStyle = data.active.ok ? "#B45309" : "#9A1B1B";
+    const activeSnr = isDraggingSnr
+      ? lookupSnrOnCachedCurves(data, state.freq_mhz, data.active.rb, state.dist_km)
+      : data.active.snr_db;
+    const pyAct = yToPx(activeSnr);
+
+    if (isDraggingSnr) {
+      ctx.fillStyle = "rgba(217, 119, 6, 0.22)";
+      ctx.beginPath();
+      ctx.arc(cx, pyAct, 12, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = data.active.ok ? "#F59E0B" : "#9A1B1B";
     ctx.strokeStyle = "#0F172A";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.arc(cx, pyAct, 5.2, 0, 2 * Math.PI);
+    ctx.arc(cx, pyAct, 6.2, 0, 2 * Math.PI);
     ctx.fill();
     ctx.stroke();
+
+    // Compact readout tag beside dragged marker
+    ctx.fillStyle = "#0F172A";
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = cx > W - 120 ? "right" : "left";
+    const tagX = cx > W - 120 ? cx - 10 : cx + 10;
+    const tagY = Math.max(pad.t + 14, Math.min(H - pad.b - 6, pyAct - 8));
+    ctx.fillText(`${fmtIdNum(state.dist_km, 2)} km · ${fmtIdNum(activeSnr, 1)} dB`, tagX, tagY);
 
     // Legend
     [700, 900, 1800].forEach((f, idx) => {
@@ -455,6 +574,7 @@
       ctx.fillStyle = FREQ_COLORS[f];
       ctx.fillRect(lx, ly - 5, 16, 3);
       ctx.fillStyle = "#0F172A";
+      ctx.font = "11px sans-serif";
       ctx.textAlign = "left";
       ctx.fillText(`${f} MHz${f === state.freq_mhz ? " (aktif)" : ""}`, lx + 22, ly);
     });
@@ -463,18 +583,24 @@
   function drawConstellations() {
     const { ctx, W, H } = setupCanvas("cvConst", 600, 275);
     const chKey = state.channel === "AWGN" ? "awgn" : "rayleigh";
+    const hasExactOrPreview =
+      mcResult &&
+      mcResultKey === currentMcParamKey() &&
+      mcStatusMode === "ready";
 
-    if (!mcResult || mcKey !== currentParamKey()) {
+    if (!hasExactOrPreview) {
       ctx.fillStyle = "#475569";
       ctx.font = "13px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(
-        mcResult
-          ? "Parameter berubah. Jalankan ulang Monte Carlo untuk konstelasi aktif."
-          : "Tekan 'Jalankan Monte Carlo' untuk menampilkan sampel I/Q nyata dari mesin Python.",
-        W / 2,
-        H / 2
-      );
+      let msg = "Tekan 'Jalankan Monte Carlo' untuk menampilkan sampel I/Q nyata.";
+      if (mcStatusMode === "outage") {
+        msg = "Konfigurasi aktif dalam keadaan outage (tidak ada transmisi).";
+      } else if (mcStatusMode === "loading") {
+        msg = "Menjalankan simulasi Monte Carlo bit-level di mesin Python...";
+      } else if (mcStatusMode === "error") {
+        msg = "Simulasi Monte Carlo gagal; tidak ada data ditampilkan.";
+      }
+      ctx.fillText(msg, W / 2, H / 2);
       return;
     }
 
@@ -489,7 +615,7 @@
       ];
     } else {
       panels = [700, 900, 1800].map((f) => {
-        const r = mcResult.by_freq[String(f)] || null;
+        const r = mcResult.by_freq && mcResult.by_freq[String(f)] ? mcResult.by_freq[String(f)] : null;
         return { title: `${f} MHz: ${r ? r.modulation : "Outage"}`, res: r };
       });
     }
@@ -554,19 +680,18 @@
     });
   }
 
-  function drawCoverageMap(stochData) {
+  function drawCoverageMap(zoneData) {
     const { ctx, W, H } = setupCanvas("cvMap", 1180, 305);
-    if (!stochData || !stochData.zones) return;
+    if (!zoneData || !zoneData.zones) return;
 
     const centers = [W * 0.17, W * 0.5, W * 0.83];
     const R_px = 104;
     const rMaxKm = 12.0;
     const cy = H / 2 + 4;
 
-    stochData.zones.forEach((zone, idx) => {
+    zoneData.zones.forEach((zone, idx) => {
       const cx = centers[idx];
 
-      // Draw outer-to-inner concentric filled circles from Python rings
       const sortedRings = [...zone.rings].sort((a, b) => b.outer_km - a.outer_km);
       sortedRings.forEach((ring) => {
         const rPx = (ring.outer_km / rMaxKm) * R_px;
@@ -579,14 +704,12 @@
         ctx.stroke();
       });
 
-      // Outer 12 km cell border
       ctx.strokeStyle = "#0F172A";
       ctx.lineWidth = 1.3;
       ctx.beginPath();
       ctx.arc(cx, cy, R_px, 0, 2 * Math.PI);
       ctx.stroke();
 
-      // Reliable radius rings
       if (zone.radius_stochastic_km > 0) {
         ctx.save();
         ctx.setLineDash([6, 4]);
@@ -608,7 +731,6 @@
         ctx.restore();
       }
 
-      // BTS & active UE markers
       ctx.fillStyle = "#0F172A";
       ctx.beginPath();
       ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
@@ -619,7 +741,7 @@
       ctx.strokeStyle = "#0F172A";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(uePx, cy, 4.5, 0, 2 * Math.PI);
+      ctx.arc(uePx, cy, 4.8, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
 
@@ -638,42 +760,73 @@
     });
   }
 
-  function updateMcStateUI() {
+  function renderMcStats() {
     const notice = document.getElementById("mcStateNotice");
     const statsBox = document.getElementById("mcStatsBox");
-    const inOutage = lastOpData && !lastOpData.active.ok;
     const chKey = state.channel === "AWGN" ? "awgn" : "rayleigh";
 
-    if (inOutage) {
+    const clearStatsBox = () => {
+      statsBox.hidden = true;
+      statsBox.innerHTML = "";
+    };
+
+    if (mcStatusMode === "outage") {
+      clearStatsBox();
       notice.hidden = false;
       notice.className = "notice-bar info";
       notice.textContent = "Tidak ada transmisi yang dapat disimulasikan pada konfigurasi outage.";
-      statsBox.hidden = true;
+      setStatusPill("mcStatusPill", "Outage", false);
       drawConstellations();
       return;
     }
 
-    if (!mcResult) {
+    if (mcStatusMode === "loading") {
+      clearStatsBox();
       notice.hidden = false;
       notice.className = "notice-bar info";
-      notice.textContent = `Belum dijalankan. Tekan Jalankan Monte Carlo untuk mengirim ${state.n_bits.toLocaleString("id-ID")} bit acak melalui kanal AWGN dan Rayleigh.`;
-      statsBox.hidden = true;
+      notice.textContent = "Memperbarui simulasi Monte Carlo bit-level...";
+      setStatusPill("mcStatusPill", "Menghitung...", true);
       drawConstellations();
       return;
     }
 
-    if (mcKey !== currentParamKey()) {
+    if (mcStatusMode === "error") {
+      clearStatsBox();
       notice.hidden = false;
-      notice.className = "notice-bar warn";
-      notice.textContent =
-        "Parameter berubah sejak simulasi terakhir. Hasil sebelumnya disembunyikan agar tidak dianggap sebagai hasil aktif; jalankan ulang Monte Carlo.";
-      statsBox.hidden = true;
+      notice.className = "notice-bar error";
+      notice.textContent = "Simulasi Monte Carlo gagal; silakan jalankan ulang.";
+      setStatusPill("mcStatusPill", "Gagal", false);
+      drawConstellations();
+      return;
+    }
+
+    if (!mcResult || mcResultKey !== currentMcParamKey() || mcStatusMode === "stale") {
+      clearStatsBox();
+      notice.hidden = false;
+      notice.className = state.live_mc ? "notice-bar info" : "notice-bar warn";
+      notice.textContent = state.live_mc
+        ? `Menunggu sinkronisasi untuk ${state.n_bits.toLocaleString("id-ID")} bit...`
+        : "Parameter berubah sejak simulasi terakhir (Live nonaktif). Tekan Jalankan Monte Carlo untuk menghitung hasil baru.";
+      setStatusPill("mcStatusPill", state.live_mc ? "Menunggu..." : "Perlu hitung ulang", false);
       drawConstellations();
       return;
     }
 
     notice.hidden = true;
     statsBox.hidden = false;
+    const isPreview = Boolean(mcResult.is_preview);
+    setStatusPill(
+      "mcStatusPill",
+      isPreview
+        ? `Pratinjau ${mcResult.opt.n_bits.toLocaleString("id-ID")} bit`
+        : `Selesai · ${mcResult.opt.n_bits.toLocaleString("id-ID")} bit`,
+      false
+    );
+
+    const previewLine = isPreview
+      ? `<div style="color:#B45309; font-weight:600;">Pratinjau cepat saat interaksi (${mcResult.opt.n_bits.toLocaleString("id-ID")} dari target ${state.n_bits.toLocaleString("id-ID")} bit); simulasi penuh berjalan otomatis setelah berhenti.</div>`
+      : "";
+
     const lines = [
       ["Dioptimalkan", mcResult.opt],
       ["Baseline S0", mcResult.base],
@@ -686,10 +839,18 @@
         err === 0
           ? `, CI 95% [0.0e+0, ${ciH.toExponential(1)}] (0 error, batas atas rule-of-three)`
           : `, CI 95% [${ciL.toExponential(1)}, ${ciH.toExponential(1)}]`;
-      return `<div><strong>${name}</strong> (${res.modulation}, Eb/N0 ${fmtIdNum(res.ebn0_db, 2)} dB, ${res.n_bits.toLocaleString("id-ID")} bit / ${res.n_symbols.toLocaleString("id-ID")} simbol, sampel konstelasi ${res[`n_samples_${chKey}`]}): BER MC AWGN ${res.mc_ber_awgn.toExponential(2)} (teori ${res.theory_ber_awgn.toExponential(2)}); Rayleigh tanpa CSI ${res.mc_ber_rayleigh.toExponential(2)} (teori ${res.theory_ber_rayleigh.toExponential(2)})${ciTxt}.</div>`;
+      return `<div><strong>${name}</strong> (${res.modulation}, Eb/N0 ${fmtIdNum(res.ebn0_db, 2)} dB, ${res.n_bits.toLocaleString("id-ID")} bit / ${res.n_symbols.toLocaleString("id-ID")} simbol, sampel konstelasi ${res[`n_samples_${chKey}`]}): BER MC AWGN ${res.mc_ber_awgn.toExponential(2)} (teori ${res.theory_ber_awgn.toExponential(2)}); Rayleigh tanpa CSI (non-adaptif) ${res.mc_ber_rayleigh.toExponential(2)} (teori ${res.theory_ber_rayleigh.toExponential(2)})${ciTxt}.</div>`;
     });
-    statsBox.innerHTML = lines.join("");
+    statsBox.innerHTML = previewLine + lines.join("");
     drawConstellations();
+  }
+
+  function invalidateMcView() {
+    if (mcResult && mcResultKey !== currentMcParamKey()) {
+      mcResult = null;
+      mcStatusMode = "stale";
+      renderMcStats();
+    }
   }
 
   async function refreshOperatingPoint() {
@@ -707,13 +868,19 @@
     };
     const key = JSON.stringify(payload);
     if (opCache.has(key)) {
+      ++opSeq;
+      if (opController) opController.abort();
       clearWorkbenchError();
+      setStatusPill("snrUpdateStatus", "Siap · Seret titik atau klik grafik", false);
       renderOperatingPoint(opCache.get(key));
-      return;
+      return opCache.get(key);
     }
+
+    const seq = ++opSeq;
     if (opController) opController.abort();
     opController = new AbortController();
-    document.getElementById("apiLoadingBanner").hidden = false;
+    setStatusPill("snrUpdateStatus", "Memperbarui kurva...", true);
+
     try {
       const data = await fetchJson("/api/operating-point", {
         method: "POST",
@@ -721,19 +888,24 @@
         body: key,
         signal: opController.signal,
       });
+      if (seq !== opSeq) return null;
       opCache.set(key, data);
       clearWorkbenchError();
+      setStatusPill("snrUpdateStatus", "Siap · Seret titik atau klik grafik", false);
       renderOperatingPoint(data);
+      return data;
     } catch (err) {
-      if (err.name === "AbortError") return;
+      if (err.name === "AbortError" || seq !== opSeq) return null;
+      setStatusPill("snrUpdateStatus", "Gagal memuat", false);
       clearTelemetryOnError();
       showWorkbenchError(`Gagal memuat titik operasi dari API Python: ${err.message}`);
-    } finally {
-      document.getElementById("apiLoadingBanner").hidden = true;
+      return null;
     }
   }
 
   async function refreshStochastic() {
+    const zoneKey = currentZoneKey();
+    const hasZonesCached = zoneCache.has(zoneKey);
     const payload = {
       freq_mhz: state.freq_mhz,
       env: state.env,
@@ -742,42 +914,74 @@
       ber_target: state.ber_target,
       active_strategy: state.strategy,
       zone_strategy: state.zone_strategy,
+      include_zones: !hasZonesCached,
     };
-    const key = JSON.stringify(payload);
-    if (stochCache.has(key)) {
-      renderStochastic(stochCache.get(key));
+    const distCacheKey = JSON.stringify({
+      f: state.freq_mhz,
+      e: state.env,
+      d: state.dist_km,
+      p: state.tx_power_dbm,
+      b: state.ber_target,
+      st: state.strategy,
+    });
+
+    if (hasZonesCached && stochDistCache.has(distCacheKey)) {
+      ++stochSeq;
+      if (stochController) stochController.abort();
+      renderStochastic(stochDistCache.get(distCacheKey), zoneKey);
       return;
     }
+
+    const seq = ++stochSeq;
     if (stochController) stochController.abort();
     stochController = new AbortController();
+
     try {
       const data = await fetchJson("/api/stochastic-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: key,
+        body: JSON.stringify(payload),
         signal: stochController.signal,
       });
-      stochCache.set(key, data);
-      renderStochastic(data);
+      if (seq !== stochSeq) return;
+      stochDistCache.set(distCacheKey, data);
+      renderStochastic(data, zoneKey);
     } catch (err) {
-      if (err.name === "AbortError") return;
+      if (err.name === "AbortError" || seq !== stochSeq) return;
       showWorkbenchError(`Gagal memuat analisis stokastik dari API Python: ${err.message}`);
     }
   }
 
-  async function runMonteCarlo() {
-    const btn = document.getElementById("btnRunMc");
-    const notice = document.getElementById("mcStateNotice");
+  async function executeMonteCarlo(isPreview) {
+    if (lastOpData && !lastOpData.active.ok) {
+      mcResult = null;
+      mcResultKey = null;
+      mcStatusMode = "outage";
+      renderMcStats();
+      return;
+    }
+
+    const reqBits = isPreview ? Math.min(state.n_bits, PREVIEW_MAX_BITS) : state.n_bits;
+    const mode = state.mc_view;
+    const paramKey = currentMcParamKey();
+    const cacheKey = JSON.stringify({ paramKey, mode, reqBits, isPreview });
+
+    if (mcCache.has(cacheKey)) {
+      mcResult = mcCache.get(cacheKey);
+      mcResultKey = paramKey;
+      mcStatusMode = "ready";
+      renderMcStats();
+      return;
+    }
+
+    const seq = ++mcSeq;
     if (mcController) mcController.abort();
     mcController = new AbortController();
+    mcInFlight = true;
+    mcResult = null;
+    mcStatusMode = "loading";
+    renderMcStats();
 
-    btn.disabled = true;
-    notice.hidden = false;
-    notice.className = "notice-bar info";
-    notice.textContent = `Menjalankan simulasi Monte Carlo bit-level (${state.n_bits.toLocaleString("id-ID")} bit)...`;
-    document.getElementById("mcStatsBox").hidden = true;
-
-    const runParamKey = currentParamKey();
     try {
       const data = await fetchJson("/api/monte-carlo", {
         method: "POST",
@@ -793,38 +997,161 @@
           strategy: state.strategy,
           rb_manual: state.rb_manual,
           mod_manual: state.mod_manual,
-          n_bits: state.n_bits,
+          n_bits: reqBits,
+          mode,
+          is_preview: isPreview,
         }),
         signal: mcController.signal,
       });
+      if (seq !== mcSeq) return;
+      mcCache.set(cacheKey, data);
       mcResult = data;
-      mcKey = runParamKey;
-      updateMcStateUI();
+      mcResultKey = paramKey;
+      mcStatusMode = "ready";
+      renderMcStats();
     } catch (err) {
-      if (err.name === "AbortError") return;
-      notice.hidden = false;
-      notice.className = "notice-bar error";
-      notice.textContent = `Monte Carlo gagal: ${err.message}`;
+      if (err.name === "AbortError" || seq !== mcSeq) return;
+      mcResult = null;
+      if (String(err.message).includes("outage")) {
+        mcStatusMode = "outage";
+      } else {
+        mcStatusMode = "error";
+      }
+      renderMcStats();
     } finally {
-      btn.disabled = lastOpData ? !lastOpData.active.ok : false;
+      if (seq === mcSeq) {
+        mcInFlight = false;
+      }
     }
   }
 
-  function refreshAllWorkbench(immediate) {
-    syncControlsFromState();
-    updateMcStateUI();
-    if (immediate) {
-      clearTimeout(sliderDebounceTimer);
-      refreshOperatingPoint();
-      refreshStochastic();
+  function scheduleLiveMc(isContinuousDrag) {
+    if (!state.live_mc) {
+      mcStatusMode = lastOpData && !lastOpData.active.ok ? "outage" : "stale";
+      renderMcStats();
       return;
     }
-    clearTimeout(sliderDebounceTimer);
-    sliderDebounceTimer = setTimeout(() => {
-      refreshOperatingPoint();
-      refreshStochastic();
-    }, 90);
+    clearTimeout(mcSettleTimer);
+
+    if (isContinuousDrag) {
+      const now = performance.now();
+      if (!mcInFlight && now - mcDragThrottleAt >= 220) {
+        mcDragThrottleAt = now;
+        executeMonteCarlo(true);
+      }
+      mcSettleTimer = setTimeout(() => {
+        executeMonteCarlo(false);
+      }, 280);
+      return;
+    }
+
+    mcSettleTimer = setTimeout(() => {
+      executeMonteCarlo(false);
+    }, 120);
   }
+
+  function scheduleVisualDragFrame() {
+    if (dragRafId !== null) return;
+    dragRafId = requestAnimationFrame(() => {
+      dragRafId = null;
+      syncControlsFromState();
+      if (lastOpData) drawSnrChart(lastOpData);
+      if (lastZonesData) drawCoverageMap(lastZonesData);
+    });
+  }
+
+  async function refreshAllWorkbench(mode) {
+    // mode: "discrete" | "drag_move" | "drag_settle"
+    const seq = ++workbenchSeq;
+    syncControlsFromState();
+    invalidateMcView();
+
+    if (mode === "drag_move") {
+      scheduleVisualDragFrame();
+      clearTimeout(analyticalTimer);
+      analyticalTimer = setTimeout(async () => {
+        if (seq !== workbenchSeq) return;
+        const op = await refreshOperatingPoint();
+        if (seq !== workbenchSeq || !op) return;
+        refreshStochastic();
+      }, 65);
+      scheduleLiveMc(true);
+      return;
+    }
+
+    clearTimeout(analyticalTimer);
+    const op = await refreshOperatingPoint();
+    if (seq !== workbenchSeq || !op) return;
+    refreshStochastic();
+    if (!op.active.ok) {
+      mcResult = null;
+      mcStatusMode = "outage";
+      renderMcStats();
+    } else {
+      scheduleLiveMc(false);
+    }
+  }
+
+  // ---------------- DRAGGABLE SNR CHART (POINTER EVENTS) ----------------
+  function pointerEventToDistKm(clientX) {
+    const cv = document.getElementById("cvSnr");
+    const rect = cv.getBoundingClientRect();
+    const xLogical = ((clientX - rect.left) / Math.max(rect.width, 1)) * SNR_W;
+    const pw = SNR_W - SNR_PAD.l - SNR_PAD.r;
+    const raw = 1.0 + ((xLogical - SNR_PAD.l) / pw) * 11.0;
+    const clamped = Math.max(1.0, Math.min(12.0, raw));
+    return Math.round(clamped * 4) / 4;
+  }
+
+  const cvSnr = document.getElementById("cvSnr");
+  cvSnr.addEventListener("pointerdown", (e) => {
+    if (e.button !== undefined && e.button !== 0 && e.pointerType === "mouse") return;
+    const rect = cvSnr.getBoundingClientRect();
+    const xLogical = ((e.clientX - rect.left) / Math.max(rect.width, 1)) * SNR_W;
+    if (xLogical < SNR_PAD.l - 14 || xLogical > SNR_W - SNR_PAD.r + 14) return;
+
+    isDraggingSnr = true;
+    activePointerId = e.pointerId;
+    cvSnr.classList.add("dragging");
+    try {
+      cvSnr.setPointerCapture(e.pointerId);
+    } catch (_) {}
+    e.preventDefault();
+
+    const nextDist = pointerEventToDistKm(e.clientX);
+    if (nextDist !== state.dist_km) {
+      state.dist_km = nextDist;
+      refreshAllWorkbench("drag_move");
+    } else {
+      scheduleVisualDragFrame();
+    }
+  });
+
+  cvSnr.addEventListener("pointermove", (e) => {
+    if (!isDraggingSnr || e.pointerId !== activePointerId) return;
+    e.preventDefault();
+    const nextDist = pointerEventToDistKm(e.clientX);
+    if (nextDist !== state.dist_km) {
+      state.dist_km = nextDist;
+      refreshAllWorkbench("drag_move");
+    }
+  });
+
+  function finishSnrDrag(e) {
+    if (!isDraggingSnr || (e && activePointerId !== null && e.pointerId !== activePointerId)) return;
+    isDraggingSnr = false;
+    cvSnr.classList.remove("dragging");
+    if (activePointerId !== null) {
+      try {
+        cvSnr.releasePointerCapture(activePointerId);
+      } catch (_) {}
+      activePointerId = null;
+    }
+    refreshAllWorkbench("drag_settle");
+  }
+
+  cvSnr.addEventListener("pointerup", finishSnrDrag);
+  cvSnr.addEventListener("pointercancel", finishSnrDrag);
 
   // ---------------- TAB B: RESULTS ----------------
   async function loadResultsTab() {
@@ -1141,7 +1468,6 @@
 
   // ---------------- NAVIGATION & EVENTS ----------------
   function switchTab(tabName) {
-    activeTab = tabName;
     const panels = {
       workbench: "panelWorkbench",
       results: "panelResults",
@@ -1168,56 +1494,72 @@
   document.querySelectorAll("[data-freq]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.freq_mhz = Number(btn.dataset.freq);
-      refreshAllWorkbench(true);
+      refreshAllWorkbench("discrete");
     });
   });
 
   document.querySelectorAll("[data-env]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.env = btn.dataset.env;
-      refreshAllWorkbench(true);
+      refreshAllWorkbench("discrete");
     });
   });
 
   document.querySelectorAll("[data-shadow]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.shadow = btn.dataset.shadow;
-      refreshAllWorkbench(true);
+      refreshAllWorkbench("discrete");
     });
   });
 
   document.querySelectorAll("[data-channel]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.channel = btn.dataset.channel;
-      refreshAllWorkbench(true);
+      syncControlsFromState();
+      if (mcResult && mcResultKey === currentMcParamKey() && mcStatusMode === "ready") {
+        if (lastStochDistData) {
+          renderStochastic(
+            {
+              ...lastStochDistData,
+              zones: null,
+            },
+            currentZoneKey()
+          );
+        } else {
+          refreshStochastic();
+        }
+        renderMcStats();
+      } else {
+        refreshAllWorkbench("discrete");
+      }
     });
   });
 
   document.querySelectorAll("[data-ber]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.ber_target = Number(btn.dataset.ber);
-      refreshAllWorkbench(true);
+      refreshAllWorkbench("discrete");
     });
   });
 
   document.querySelectorAll("[data-rb]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.rb_manual = Number(btn.dataset.rb);
-      refreshAllWorkbench(true);
+      refreshAllWorkbench("discrete");
     });
   });
 
   document.querySelectorAll("[data-mod]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.mod_manual = btn.dataset.mod;
-      refreshAllWorkbench(true);
+      refreshAllWorkbench("discrete");
     });
   });
 
   document.querySelectorAll("[data-nbits]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.n_bits = Number(btn.dataset.nbits);
-      refreshAllWorkbench(true);
+      refreshAllWorkbench("discrete");
     });
   });
 
@@ -1225,8 +1567,22 @@
     btn.addEventListener("click", () => {
       state.mc_view = btn.dataset.mcview;
       setActiveSegment("data-mcview", state.mc_view);
+      if (state.mc_view === "by_freq" && mcResult && (!mcResult.by_freq || !Object.keys(mcResult.by_freq).length)) {
+        if (state.live_mc) {
+          executeMonteCarlo(false);
+          return;
+        }
+      }
       drawConstellations();
     });
+  });
+
+  document.getElementById("chkLiveMc").addEventListener("change", (e) => {
+    state.live_mc = Boolean(e.target.checked);
+    syncControlsFromState();
+    if (state.live_mc && mcStatusMode !== "ready") {
+      scheduleLiveMc(false);
+    }
   });
 
   document.getElementById("selStrat").addEventListener("change", (e) => {
@@ -1234,32 +1590,44 @@
     if (["S0", "S1", "S2", "S3", "R0"].includes(state.strategy)) {
       state.zone_strategy = state.strategy;
     }
-    refreshAllWorkbench(true);
+    refreshAllWorkbench("discrete");
   });
 
   document.getElementById("selZoneStrat").addEventListener("change", (e) => {
     state.zone_strategy = e.target.value;
-    refreshAllWorkbench(true);
+    refreshAllWorkbench("discrete");
   });
 
   document.getElementById("rngDist").addEventListener("input", (e) => {
     state.dist_km = Number(e.target.value);
-    refreshAllWorkbench(false);
+    refreshAllWorkbench("drag_move");
+  });
+  document.getElementById("rngDist").addEventListener("change", (e) => {
+    state.dist_km = Number(e.target.value);
+    refreshAllWorkbench("drag_settle");
   });
 
   document.getElementById("rngPt").addEventListener("input", (e) => {
     state.tx_power_dbm = Number(e.target.value);
-    refreshAllWorkbench(false);
+    refreshAllWorkbench("drag_move");
+  });
+  document.getElementById("rngPt").addEventListener("change", (e) => {
+    state.tx_power_dbm = Number(e.target.value);
+    refreshAllWorkbench("drag_settle");
   });
 
   document.getElementById("btnPreset").addEventListener("click", () => {
-    Object.assign(state, DEFAULTS);
+    const keepLive = state.live_mc;
+    Object.assign(state, DEFAULTS, { live_mc: keepLive });
     mcResult = null;
-    mcKey = null;
-    refreshAllWorkbench(true);
+    mcResultKey = null;
+    refreshAllWorkbench("discrete");
   });
 
-  document.getElementById("btnRunMc").addEventListener("click", runMonteCarlo);
+  document.getElementById("btnRunMc").addEventListener("click", () => {
+    clearTimeout(mcSettleTimer);
+    executeMonteCarlo(false);
+  });
 
   document.querySelectorAll("[data-resenv]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1271,5 +1639,5 @@
   document.getElementById("inpGlossSearch").addEventListener("input", renderGlossaryTable);
   document.getElementById("selGlossCat").addEventListener("change", renderGlossaryTable);
 
-  refreshAllWorkbench(true);
+  refreshAllWorkbench("discrete");
 })();
