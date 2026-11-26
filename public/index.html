@@ -287,10 +287,8 @@
 
             <article class="panel chart-panel">
               <div class="chart-head">
-                <h2>Monte Carlo Bit-Level &amp; Konstelasi Diterima (SIMULATED)</h2>
-                <span class="status-pill" id="mcStatusPill">Siap</span>
+                <h2>Monte Carlo &amp; Konstelasi (SIMULATED)</h2>
               </div>
-              <span class="chart-note" id="mcPairSummary">Aktif vs S0</span>
               <div class="mc-toolbar">
                 <button type="button" class="btn-primary" id="btnRunMc">Jalankan Monte Carlo</button>
                 <div class="segmented two-col" role="group" aria-label="Pilih Tampilan Konstelasi">
@@ -298,7 +296,9 @@
                   <button type="button" class="seg-btn" data-mcview="by_freq" aria-pressed="false">Antar Frekuensi</button>
                 </div>
               </div>
-              <div class="mc-stats" id="mcStatsBox">Menyiapkan simulasi Monte Carlo bit-level...</div>
+              <div class="mc-stats" id="mcStatsBox">
+                <div class="mc-stats-muted">Menyiapkan simulasi Monte Carlo...</div>
+              </div>
               <canvas id="cvConst" width="600" height="275"></canvas>
             </article>
           </div>

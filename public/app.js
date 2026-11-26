@@ -116,13 +116,6 @@
     });
   }
 
-  function setStatusPill(id, text, updating) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = text;
-    el.classList.toggle("updating", Boolean(updating));
-  }
-
   function setActiveSegment(attr, value) {
     document.querySelectorAll(`[${attr}]`).forEach((btn) => {
       const match = String(btn.getAttribute(attr)) === String(value);
@@ -651,7 +644,7 @@
 
       const smp = p.res[`samples_${chKey}`];
       ctx.fillStyle = "#B45309";
-      ctx.globalAlpha = isCurrent ? 0.6 : 0.36;
+      ctx.globalAlpha = isCurrent ? 0.6 : 0.42;
       for (let i = 0; i < smp.i.length; i += 1) {
         const px = cx + smp.i[i] * scale;
         const py = cy - smp.q[i] * scale;
@@ -675,29 +668,6 @@
         ctx.stroke();
       }
     });
-
-    if (!isCurrent) {
-      const tagText =
-        mcStatusMode === "updating"
-          ? "Sebelumnya · memperbarui"
-          : mcStatusMode === "error"
-            ? "Sebelumnya · gagal"
-            : "Sebelumnya";
-      ctx.font = "600 10.5px sans-serif";
-      const tw = ctx.measureText(tagText).width + 14;
-      const bx = W - tw - 8;
-      const by = H - 24;
-      ctx.fillStyle = "rgba(255, 251, 235, 0.94)";
-      ctx.strokeStyle = "#F59E0B";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, tw, 18, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#B45309";
-      ctx.textAlign = "center";
-      ctx.fillText(tagText, bx + tw / 2, by + 12.5);
-    }
   }
 
   function drawCoverageMap(zoneData) {
@@ -780,30 +750,32 @@
     });
   }
 
-  function formatMcResultLines(resObj, chKey) {
-    return [
-      ["Dioptimalkan", resObj.opt],
-      ["Baseline S0", resObj.base],
-    ].map(([name, res]) => {
-      if (!res) return `<div><strong>${name}:</strong> outage, tidak ada transmisi.</div>`;
-      const err = res[`mc_errors_${chKey}`];
-      const ciL = res[`ci_low_${chKey}`];
-      const ciH = res[`ci_high_${chKey}`];
-      const ciTxt =
-        err === 0
-          ? `, CI 95% [0.0e+0, ${ciH.toExponential(1)}] (0 error, batas atas rule-of-three)`
-          : `, CI 95% [${ciL.toExponential(1)}, ${ciH.toExponential(1)}]`;
-      return `<div><strong>${name}</strong> (${res.modulation}, Eb/N0 ${fmtIdNum(res.ebn0_db, 2)} dB, ${res.n_bits.toLocaleString("id-ID")} bit / ${res.n_symbols.toLocaleString("id-ID")} simbol, sampel konstelasi ${res[`n_samples_${chKey}`]}): BER MC AWGN ${res.mc_ber_awgn.toExponential(2)} (teori ${res.theory_ber_awgn.toExponential(2)}); Rayleigh tanpa CSI (non-adaptif) ${res.mc_ber_rayleigh.toExponential(2)} (teori ${res.theory_ber_rayleigh.toExponential(2)})${ciTxt}.</div>`;
-    });
+  function formatMcSummaryGrid(resObj, metaLine, metaClass) {
+    const opt = resObj.opt;
+    const base = resObj.base;
+    const activeTxt = `${opt.modulation} · Eb/N0 ${fmtIdNum(opt.ebn0_db, 2)} dB · ${opt.n_bits.toLocaleString("id-ID")} bit`;
+    const awgnTxt = `${opt.mc_ber_awgn.toExponential(2)} MC (teori ${opt.theory_ber_awgn.toExponential(2)})`;
+    const rayTxt = `${opt.mc_ber_rayleigh.toExponential(2)} MC (teori ${opt.theory_ber_rayleigh.toExponential(2)}, non-CSI)`;
+    const baseTxt = base
+      ? `QPSK × 25 RB · AWGN ${base.mc_ber_awgn.toExponential(2)} · Rayleigh ${base.mc_ber_rayleigh.toExponential(2)}`
+      : "Outage (tidak ada transmisi)";
+
+    return `
+      <div class="mc-stats-meta ${metaClass || ""}">${metaLine}</div>
+      <div class="mc-kv-grid">
+        <span class="mc-kv-key">Aktif</span><span class="mc-kv-val">${activeTxt}</span>
+        <span class="mc-kv-key">BER AWGN</span><span class="mc-kv-val">${awgnTxt}</span>
+        <span class="mc-kv-key">BER Rayleigh</span><span class="mc-kv-val">${rayTxt}</span>
+        <span class="mc-kv-key">Baseline S0</span><span class="mc-kv-val">${baseTxt}</span>
+      </div>
+    `;
   }
 
   function renderMcStats() {
     const statsBox = document.getElementById("mcStatsBox");
-    const chKey = state.channel === "AWGN" ? "awgn" : "rayleigh";
 
     if (mcStatusMode === "outage") {
-      statsBox.innerHTML = `<div class="mc-stats-muted">Tidak ada transmisi yang dapat disimulasikan pada konfigurasi outage.</div>`;
-      setStatusPill("mcStatusPill", "Outage", false);
+      statsBox.innerHTML = `<div class="mc-stats-muted">Konfigurasi aktif dalam keadaan outage (tidak ada transmisi).</div>`;
       drawConstellations();
       return;
     }
@@ -815,49 +787,32 @@
 
     if (isCurrent) {
       const isPreview = Boolean(lastValidMcResult.is_preview);
-      setStatusPill(
-        "mcStatusPill",
-        isPreview
-          ? `Pratinjau ${lastValidMcResult.opt.n_bits.toLocaleString("id-ID")} bit`
-          : `Selesai · ${lastValidMcResult.opt.n_bits.toLocaleString("id-ID")} bit`,
-        false
+      const metaLine = isPreview
+        ? `Pratinjau ${lastValidMcResult.opt.n_bits.toLocaleString("id-ID")} bit · simulasi penuh menyusul...`
+        : `SIMULATED · ${lastValidMcResult.opt.n_bits.toLocaleString("id-ID")} bit (${lastValidMcResult.opt.n_symbols.toLocaleString("id-ID")} simbol)`;
+      statsBox.innerHTML = formatMcSummaryGrid(
+        lastValidMcResult,
+        metaLine,
+        isPreview ? "updating" : ""
       );
-      const previewLine = isPreview
-        ? `<div class="mc-stats-meta">Pratinjau cepat (${lastValidMcResult.opt.n_bits.toLocaleString("id-ID")} dari target ${state.n_bits.toLocaleString("id-ID")} bit); simulasi penuh menyusul otomatis.</div>`
-        : "";
-      statsBox.innerHTML = previewLine + formatMcResultLines(lastValidMcResult, chKey).join("");
       drawConstellations();
       return;
     }
 
-    if (mcStatusMode === "updating") {
-      setStatusPill("mcStatusPill", "Memperbarui...", true);
-    } else if (mcStatusMode === "error") {
-      setStatusPill("mcStatusPill", "Gagal", false);
-    } else if (mcStatusMode === "stale") {
-      setStatusPill(
-        "mcStatusPill",
-        state.live_mc ? "Menunggu sinkron..." : "Perlu hitung ulang",
-        false
-      );
-    } else {
-      setStatusPill("mcStatusPill", "Siap", false);
-    }
-
     if (lastValidMcResult && lastValidMcMeta) {
-      const prevDesc = `${fmtIdNum(lastValidMcMeta.dist_km, 2)} km, ${lastValidMcMeta.freq_mhz} MHz, ${lastValidMcMeta.n_bits.toLocaleString("id-ID")} bit`;
-      const reason =
+      const prevDesc = `${fmtIdNum(lastValidMcMeta.dist_km, 2)} km, ${lastValidMcMeta.freq_mhz} MHz`;
+      const metaLine =
         mcStatusMode === "updating"
-          ? "memperbarui..."
+          ? `Memperbarui… hasil sebelumnya (${prevDesc})`
           : mcStatusMode === "error"
-            ? `gagal memperbarui (${mcLastError || "error"})`
-            : "parameter berubah (Live nonaktif)";
-      const header = `<div class="mc-stats-meta">Hasil sebelumnya (${prevDesc}) — ${reason}</div>`;
-      statsBox.innerHTML = header + formatMcResultLines(lastValidMcResult, chKey).join("");
+            ? `Gagal memperbarui (${mcLastError || "error"}) · hasil sebelumnya (${prevDesc})`
+            : `Parameter berubah · hasil sebelumnya (${prevDesc})`;
+      const metaCls = mcStatusMode === "error" ? "error" : "updating";
+      statsBox.innerHTML = formatMcSummaryGrid(lastValidMcResult, metaLine, metaCls);
     } else if (mcStatusMode === "error") {
-      statsBox.innerHTML = `<div style="color:#9A1B1B; font-weight:600;">Simulasi Monte Carlo gagal: ${mcLastError || "silakan jalankan ulang."}</div>`;
+      statsBox.innerHTML = `<div class="mc-stats-meta error">Simulasi Monte Carlo gagal: ${mcLastError || "silakan jalankan ulang."}</div>`;
     } else {
-      statsBox.innerHTML = `<div class="mc-stats-muted">Menyiapkan simulasi Monte Carlo bit-level...</div>`;
+      statsBox.innerHTML = `<div class="mc-stats-muted">Menyiapkan simulasi Monte Carlo...</div>`;
     }
     drawConstellations();
   }
