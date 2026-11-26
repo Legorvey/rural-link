@@ -227,3 +227,44 @@ def test_results_methodology_and_glossary_endpoints():
     gl_csv = client.get("/api/glossary/csv")
     assert gl_csv.status_code == 200
     assert "Kategori,Istilah / Singkatan" in gl_csv.content.decode("utf-8-sig")
+
+
+def test_compact_distance_stochastic_and_mc_preview_modes():
+    st_resp = client.post(
+        "/api/stochastic-analysis",
+        json={
+            "freq_mhz": 900,
+            "env": "NLOS",
+            "dist_km": 5.0,
+            "tx_power_dbm": 23.0,
+            "ber_target": 1e-2,
+            "active_strategy": "S3",
+            "zone_strategy": "S3",
+            "include_zones": False,
+        },
+    )
+    assert st_resp.status_code == 200
+    st_body = st_resp.json()
+    assert st_body["zones"] is None
+    assert st_body["active_outage"]["fading_cond_ber_mean"] <= 1e-2
+    assert len(st_body["strategy_comparison"]) == 5
+
+    mc_resp = client.post(
+        "/api/monte-carlo",
+        json={
+            "freq_mhz": 900,
+            "env": "NLOS",
+            "dist_km": 5.0,
+            "strategy": "S3",
+            "n_bits": 10_000,
+            "mode": "opt_vs_s0",
+            "is_preview": True,
+        },
+    )
+    assert mc_resp.status_code == 200
+    mc_body = mc_resp.json()
+    assert mc_body["is_preview"] is True
+    assert mc_body["mode"] == "opt_vs_s0"
+    assert mc_body["by_freq"] == {}
+    assert mc_body["opt"]["n_bits"] == 10_000
+    assert mc_body["opt"]["n_samples_awgn"] <= 320
