@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RuralLink: Workbench Jangkauan Uplink Adaptif (Kelompok 1)</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-row">
+        <div class="brand-block">
+          <h1>RuralLink: Workbench Jangkauan Uplink Adaptif</h1>
+          <p class="brand-sub">
+            Analisis Peningkatan Jangkauan Uplink melalui Modulasi Adaptif dan Alokasi Bandwidth pada Frekuensi 900 MHz dan 1800 MHz di Wilayah 3T Indonesia
+          </p>
+          <p class="brand-sub">
+            <strong>Kelompok 1</strong> | Sistem Komunikasi Digital (2026) | Tim: Aditya, Zahran, Baihaqy, Jeyd, Rizqul, Yusril
+          </p>
+        </div>
+        <div class="topbar-meta">
+          <span class="pill-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+              <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+              <circle cx="12" cy="20" r="1" />
+            </svg>
+            Model: Park (2023) · Reddy (2022) · Khan (2025) · Cho &amp; Yoon (2002)
+          </span>
+          <span>B_ch = 5 MHz (maks 25 RB = 4,5 MHz) · NF = 4 dB · UE ≤ 23 dBm</span>
+        </div>
+      </div>
+
+      <nav class="main-nav" role="tablist" aria-label="Navigasi Halaman RuralLink">
+        <button type="button" class="nav-tab active" role="tab" id="tabBtnWorkbench" aria-selected="true" aria-controls="panelWorkbench" data-tab="workbench">
+          A. Workbench
+        </button>
+        <button type="button" class="nav-tab" role="tab" id="tabBtnResults" aria-selected="false" aria-controls="panelResults" data-tab="results">
+          B. Hasil Penelitian
+        </button>
+        <button type="button" class="nav-tab" role="tab" id="tabBtnMethodology" aria-selected="false" aria-controls="panelMethodology" data-tab="methodology">
+          C. Metodologi &amp; Batasan
+        </button>
+        <button type="button" class="nav-tab" role="tab" id="tabBtnEncyclopedia" aria-selected="false" aria-controls="panelEncyclopedia" data-tab="encyclopedia">
+          D. Ensiklopedia
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page-wrap">
+    <!-- TAB A: WORKBENCH -->
+    <section id="panelWorkbench" class="tab-panel" role="tabpanel" aria-labelledby="tabBtnWorkbench">
+      <div class="workbench">
+        <aside class="panel controls-rail" aria-label="Panel Parameter Simulasi">
+          <div class="control-group">
+            <button type="button" class="btn-secondary" id="btnPreset">
+              Preset: pemulihan tepi sel
+            </button>
+            <p class="control-hint">
+              900 MHz NLOS, 5,0 km, 23 dBm, S3, BER 10⁻². Baseline S0 mengalami outage di jarak ini.
+            </p>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">
+              <span>Frekuensi Pembawa (MHz)</span>
+              <span class="val-readout" id="lblFreq">900 MHz</span>
+            </div>
+            <div class="segmented" role="group" aria-label="Pilih Frekuensi Pembawa">
+              <button type="button" class="seg-btn" data-freq="700" aria-pressed="false">700 MHz</button>
+              <button type="button" class="seg-btn active" data-freq="900" aria-pressed="true">900 MHz</button>
+              <button type="button" class="seg-btn" data-freq="1800" aria-pressed="false">1800 MHz</button>
+            </div>
+            <p class="control-hint">
+              Riset utama: 900 &amp; 1800 MHz. Suplemen sensitivitas: 700 MHz (model CI Park 2023).
+            </p>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">
+              <span>Kondisi Propagasi CI</span>
+              <span class="val-readout" id="lblEnv">NLOS</span>
+            </div>
+            <div class="segmented two-col" role="group" aria-label="Pilih Lingkungan Propagasi">
+              <button type="button" class="seg-btn" data-env="LOS" aria-pressed="false">LOS (n=2,16)</button>
+              <button type="button" class="seg-btn active" data-env="NLOS" aria-pressed="true">NLOS (n=2,56)</button>
+            </div>
+            <p class="control-hint" id="hintEnv">NLOS standar Park (2023): n = 2,56; σ = 11,40 dB.</p>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">
+              <span>Shadowing</span>
+              <span class="val-readout" id="lblShadow">Median</span>
+            </div>
+            <div class="segmented two-col" role="group" aria-label="Pilih Mode Shadowing">
+              <button type="button" class="seg-btn active" data-shadow="median" aria-pressed="true">Median (0 dB)</button>
+              <button type="button" class="seg-btn" data-shadow="margin95" aria-pressed="false">Margin 95%</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">
+              <span>Model Kanal</span>
+              <span class="val-readout" id="lblChannel">AWGN</span>
+            </div>
+            <div class="segmented two-col" role="group" aria-label="Pilih Model Kanal">
+              <button type="button" class="seg-btn active" data-channel="AWGN" aria-pressed="true">AWGN</button>
+              <button type="button" class="seg-btn" data-channel="Rayleigh" aria-pressed="false">Rayleigh (CSI)</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="rngDist">
+              <span>Jarak UE ke BTS (d)</span>
+              <span class="val-readout" id="lblDist">5,00 km</span>
+            </label>
+            <input id="rngDist" type="range" min="1.0" max="12.0" step="0.25" value="5.0" />
+            <div class="range-bounds"><span>1,0 km</span><span>6,5 km</span><span>12,0 km</span></div>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="rngPt">
+              <span>Daya Pancar UE (Pt, maks 23)</span>
+              <span class="val-readout" id="lblPt">23 dBm</span>
+            </label>
+            <input id="rngPt" type="range" min="10" max="23" step="1" value="23" />
+            <div class="range-bounds"><span>10 dBm</span><span>16 dBm</span><span>23 dBm (maks)</span></div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">
+              <span>Target Batas BER</span>
+              <span class="val-readout" id="lblTargetBer">10⁻²</span>
+            </div>
+            <div class="segmented two-col" role="group" aria-label="Pilih Target BER">
+              <button type="button" class="seg-btn active" data-ber="0.01" aria-pressed="true">10⁻² (Primer)</button>
+              <button type="button" class="seg-btn" data-ber="0.001" aria-pressed="false">10⁻³ (Eksploratori)</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="selStrat">Strategi Optimasi</label>
+            <select id="selStrat">
+              <option value="S0">S0: Fixed QPSK, fixed 25 RB</option>
+              <option value="S1">S1: Adaptive modulation, 25 RB</option>
+              <option value="S2">S2: Adaptive bandwidth, QPSK</option>
+              <option value="S3" selected>S3: Joint adaptive</option>
+              <option value="R0">R0: Fixed BPSK, 1 RB (robust reference)</option>
+              <option value="MANUAL">Manual: RB dan modulasi dikunci pengguna</option>
+            </select>
+            <p class="control-hint" id="hintStrat">Mode adaptif: optimizer memilih modulasi dan RB.</p>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">
+              <span>Jumlah RB (manual)</span>
+              <span class="val-readout" id="lblRbManual">25 RB</span>
+            </div>
+            <div class="segmented five-col" role="group" aria-label="Pilih Jumlah RB Manual">
+              <button type="button" class="seg-btn" data-rb="1" aria-pressed="false" disabled>1</button>
+              <button type="button" class="seg-btn" data-rb="2" aria-pressed="false" disabled>2</button>
+              <button type="button" class="seg-btn" data-rb="5" aria-pressed="false" disabled>5</button>
+              <button type="button" class="seg-btn" data-rb="10" aria-pressed="false" disabled>10</button>
+              <button type="button" class="seg-btn active" data-rb="25" aria-pressed="true" disabled>25</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">
+              <span>Modulasi (manual)</span>
+              <span class="val-readout" id="lblModManual">QPSK</span>
+            </div>
+            <div class="segmented four-col" role="group" aria-label="Pilih Modulasi Manual">
+              <button type="button" class="seg-btn" data-mod="BPSK" aria-pressed="false" disabled>BPSK</button>
+              <button type="button" class="seg-btn active" data-mod="QPSK" aria-pressed="true" disabled>QPSK</button>
+              <button type="button" class="seg-btn" data-mod="16-QAM" aria-pressed="false" disabled>16QAM</button>
+              <button type="button" class="seg-btn" data-mod="64-QAM" aria-pressed="false" disabled>64QAM</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label">
+              <span>Jumlah Bit (Monte Carlo)</span>
+              <span class="val-readout" id="lblMcBits">10⁵ (100.000)</span>
+            </div>
+            <div class="segmented five-col" role="group" aria-label="Pilih Jumlah Bit Monte Carlo">
+              <button type="button" class="seg-btn" data-nbits="100" aria-pressed="false">10²</button>
+              <button type="button" class="seg-btn" data-nbits="1000" aria-pressed="false">10³</button>
+              <button type="button" class="seg-btn" data-nbits="10000" aria-pressed="false">10⁴</button>
+              <button type="button" class="seg-btn active" data-nbits="100000" aria-pressed="true">10⁵</button>
+              <button type="button" class="seg-btn" data-nbits="1000000" aria-pressed="false">10⁶</button>
+            </div>
+            <p class="notice-bar warn" id="mcSmallSampleWarn" hidden>
+              Sampel kecil memiliki ketidakpastian statistik tinggi (interval kepercayaan lebar dan berpeluang 0 error pada BER rendah).
+            </p>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label"><span>Ringkasan 700 / 900 / 1800 MHz (pada d)</span></div>
+            <div class="table-scroll">
+              <table class="compare-table" aria-label="Tabel Ringkas 700, 900, dan 1800 MHz">
+                <thead>
+                  <tr>
+                    <th>Metrik</th>
+                    <th>700</th>
+                    <th>900</th>
+                    <th>1800</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>SNR aktif</td>
+                    <td id="cmpSnr700">-</td>
+                    <td id="cmpSnr900">-</td>
+                    <td id="cmpSnr1800">-</td>
+                  </tr>
+                  <tr>
+                    <td>Konfig</td>
+                    <td id="cmpMod700">-</td>
+                    <td id="cmpMod900">-</td>
+                    <td id="cmpMod1800">-</td>
+                  </tr>
+                  <tr>
+                    <td>Andal S3</td>
+                    <td id="cmpCov700">-</td>
+                    <td id="cmpCov900">-</td>
+                    <td id="cmpCov1800">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </aside>
+
+        <div class="main-stage">
+          <div class="notice-bar warn" id="exploratoryBanner" hidden></div>
+          <div class="notice-bar error" id="apiErrorBanner" hidden role="alert"></div>
+          <div class="notice-bar info" id="apiLoadingBanner" hidden>Memuat perhitungan mesin Python...</div>
+          <div class="notice-bar warn" id="outageBanner" hidden></div>
+
+          <div class="telemetry-strip" aria-label="Telemetry Link Uplink">
+            <div class="telemetry-cell">
+              <div class="t-label">Path Loss CI</div>
+              <div class="t-value" id="kpiPl">-</div>
+              <div class="t-sub" id="kpiPlSub">THEORETICAL</div>
+            </div>
+            <div class="telemetry-cell">
+              <div class="t-label">Daya Terima Pr</div>
+              <div class="t-value" id="kpiPr">-</div>
+              <div class="t-sub" id="kpiPrSub">P/RB</div>
+            </div>
+            <div class="telemetry-cell">
+              <div class="t-label">Noise Floor</div>
+              <div class="t-value" id="kpiNoise">-</div>
+              <div class="t-sub" id="kpiNoiseSub">B_active</div>
+            </div>
+            <div class="telemetry-cell">
+              <div class="t-label">SNR (Es/N0)</div>
+              <div class="t-value" id="kpiSnr">-</div>
+              <div class="t-sub" id="kpiSnrSub">Eb/N0</div>
+            </div>
+            <div class="telemetry-cell">
+              <div class="t-label">Konfigurasi Aktif</div>
+              <div class="t-value" id="kpiMod">-</div>
+              <div class="t-sub" id="kpiModSub">Strategi</div>
+            </div>
+            <div class="telemetry-cell">
+              <div class="t-label" id="kpiBerLabel">BER Analitis</div>
+              <div class="t-value" id="kpiBer">-</div>
+              <div class="t-sub" id="kpiBerSub">Target BER</div>
+            </div>
+            <div class="telemetry-cell">
+              <div class="t-label">Laju Nominal</div>
+              <div class="t-value" id="kpiRate">-</div>
+              <div class="t-sub" id="kpiRateSub">tanpa coding (bukan LTE)</div>
+            </div>
+            <div class="telemetry-cell">
+              <div class="t-label">Probabilitas Outage</div>
+              <div class="t-value sim" id="kpiOutage">-</div>
+              <div class="t-sub" id="kpiOutageSub">SIMULATED</div>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <article class="panel chart-panel">
+              <div class="chart-head">
+                <h2 id="snrChartTitle">Kurva SNR terhadap Jarak (700 / 900 / 1800 MHz, THEORETICAL)</h2>
+                <span class="chart-note">Garis penuh: 1 RB · Putus pendek: 25 RB · Garis horizontal: ambang Es/N0 Cho &amp; Yoon</span>
+              </div>
+              <canvas id="cvSnr" width="660" height="310"></canvas>
+            </article>
+
+            <article class="panel chart-panel">
+              <div class="chart-head">
+                <h2>Monte Carlo Bit-Level &amp; Konstelasi Diterima (SIMULATED)</h2>
+                <span class="chart-note" id="mcPairSummary">Aktif vs S0</span>
+              </div>
+              <div class="mc-toolbar">
+                <button type="button" class="btn-primary" id="btnRunMc">Jalankan Monte Carlo</button>
+                <div class="segmented two-col" role="group" aria-label="Pilih Tampilan Konstelasi">
+                  <button type="button" class="seg-btn active" data-mcview="opt_vs_s0" aria-pressed="true">Dioptimalkan vs S0</button>
+                  <button type="button" class="seg-btn" data-mcview="by_freq" aria-pressed="false">Antar Frekuensi</button>
+                </div>
+              </div>
+              <div class="notice-bar info" id="mcStateNotice">
+                Belum dijalankan. Tekan Jalankan Monte Carlo untuk mengirim bit acak melalui kanal AWGN dan Rayleigh.
+              </div>
+              <div class="mc-stats" id="mcStatsBox" hidden></div>
+              <canvas id="cvConst" width="600" height="275"></canvas>
+            </article>
+          </div>
+
+          <article class="panel chart-panel">
+            <div class="chart-head">
+              <h2>Peta Zona Modulasi Radial Sisi-ke-Sisi (1–12 km, model hipotetis)</h2>
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <label for="selZoneStrat" class="chart-note" style="font-weight:600;">Strategi peta:</label>
+                <select id="selZoneStrat" style="width:auto; min-width:220px;">
+                  <option value="S0">S0: Fixed QPSK, fixed 25 RB</option>
+                  <option value="S1">S1: Adaptive modulation, 25 RB</option>
+                  <option value="S2">S2: Adaptive bandwidth, QPSK</option>
+                  <option value="S3" selected>S3: Joint adaptive</option>
+                  <option value="R0">R0: Fixed BPSK, 1 RB</option>
+                </select>
+                <span class="chart-note">
+                  <span class="dot" style="background:#0F2A47"></span>64-QAM
+                  &nbsp;<span class="dot" style="background:#0F766E"></span>16-QAM
+                  &nbsp;<span class="dot" style="background:#7FA6C9"></span>QPSK
+                  &nbsp;<span class="dot" style="background:#B45309"></span>BPSK
+                  &nbsp;<span class="dot" style="background:#D5DBE3"></span>Outage
+                </span>
+              </div>
+            </div>
+            <canvas id="cvMap" width="1180" height="305"></canvas>
+            <p class="control-hint">
+              Cincin berwarna: zona median PL (THEORETICAL). Garis putus navy: batas 95% andal shadowing. Garis titik amber: batas 95% andal (+Rayleigh CSI). Radius 12 km tersensor kanan (≥12 km).
+            </p>
+          </article>
+
+          <div class="two-col-grid">
+            <article class="panel chart-panel">
+              <div class="chart-head">
+                <h2 id="stratTableTitle">Fixed vs Adaptif pada 5,00 km (900 MHz NLOS)</h2>
+                <span class="chart-note">5.000 realisasi bersama (seed 42), laju efektif outage = 0</span>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table" id="tblStrategyCmp">
+                  <thead>
+                    <tr>
+                      <th>Strategi</th>
+                      <th>Konfig Median</th>
+                      <th>Laju Median</th>
+                      <th>Outage Shadow</th>
+                      <th>Outage +Rayleigh</th>
+                      <th>Laju Efektif CSI</th>
+                      <th>BER Bersyarat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="7">Memuat data stokastik...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="panel chart-panel">
+              <div class="chart-head">
+                <h2 id="freqTableTitle">Perbandingan Frekuensi pada 5,00 km (NLOS)</h2>
+                <span class="chart-note">Seed identik 42 antar frekuensi</span>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table" id="tblFreqCmp">
+                  <thead>
+                    <tr>
+                      <th>Frekuensi</th>
+                      <th>PL (dB)</th>
+                      <th>SNR 25 RB</th>
+                      <th>SNR 1 RB</th>
+                      <th>Pilihan S3</th>
+                      <th>Laju S3</th>
+                      <th>Radius Median S3</th>
+                      <th>Radius 95% (+Fading)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="8">Memuat data frekuensi...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB B: RESEARCH RESULTS -->
+    <section id="panelResults" class="tab-panel" role="tabpanel" aria-labelledby="tabBtnResults" hidden>
+      <div class="section-stack">
+        <div class="notice-bar">
+          Hasil publikasi dibaca langsung dari <code>outputs/</code> (900/1800 MHz, UE 23 dBm, BER 1e-2, seed 42, 5.000 realisasi bersama, grid 1–12 km). Label: <strong>THEORETICAL</strong> = median path loss dan rumus tertutup. <strong>SIMULATED</strong> = shadowing, Rayleigh, dan Monte Carlo bit-level. Laju nominal tanpa coding, bukan throughput LTE.
+        </div>
+
+        <div class="notice-bar info" id="resultsLoading" hidden>Memuat hasil penelitian...</div>
+        <div class="notice-bar error" id="resultsError" hidden role="alert"></div>
+
+        <article class="panel chart-panel">
+          <div class="chart-head">
+            <h2>Filter Kurva Publikasi (Outage &amp; Laju Efektif)</h2>
+            <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
+              <div class="segmented two-col" role="group" aria-label="Pilih Lingkungan Hasil">
+                <button type="button" class="seg-btn" data-resenv="LOS" aria-pressed="false">LOS</button>
+                <button type="button" class="seg-btn active" data-resenv="NLOS" aria-pressed="true">NLOS</button>
+              </div>
+              <div class="inline-checks" id="resStratChecks" role="group" aria-label="Pilih Strategi Hasil"></div>
+            </div>
+          </div>
+          <div class="two-col-grid">
+            <div>
+              <h3 style="margin:0 0 6px; font-size:13.5px;">Outage vs Jarak: Shadowing + Rayleigh CSI (%, SIMULATED)</h3>
+              <canvas id="cvResOutage" width="580" height="270"></canvas>
+            </div>
+            <div>
+              <h3 style="margin:0 0 6px; font-size:13.5px;">Laju Efektif vs Jarak (Mbit/s, SIMULATED, outage = 0)</h3>
+              <canvas id="cvResRate" width="580" height="270"></canvas>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="chart-head">
+            <h2>Ringkasan Radius Cakupan (&lt;1 km: belum melayani titik pertama; ≥12 km: tersensor kanan)</h2>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="tblPubSummary">
+              <thead>
+                <tr>
+                  <th>MHz</th>
+                  <th>Strategi</th>
+                  <th>Median PL (THEORETICAL)</th>
+                  <th>Shadowing 5% (SIMULATED)</th>
+                  <th>Shadowing + Rayleigh CSI (SIMULATED)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="pubFindingsList" class="notice-bar info"></div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="chart-head">
+            <h2>Validasi Monte Carlo Bit-Level pada Titik Operasi S3 (SIMULATED)</h2>
+            <span class="chart-note">BER Rayleigh di sini adalah rata-rata tanpa CSI pada modulasi dari SNR lambat, bukan BER bersyarat adaptif.</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="tblPubMc">
+              <thead>
+                <tr>
+                  <th>MHz</th>
+                  <th>Env</th>
+                  <th>Jarak (km)</th>
+                  <th>Modulasi</th>
+                  <th>N_RB</th>
+                  <th>Eb/N0 (dB)</th>
+                  <th>BER Teori AWGN</th>
+                  <th>BER MC AWGN</th>
+                  <th>BER Teori Rayleigh</th>
+                  <th>BER MC Rayleigh</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="chart-head">
+            <h2>Grafik Hasil Publikasi (PNG) &amp; Unduhan Dataset (CSV)</h2>
+          </div>
+          <div class="figure-grid" id="pubFiguresGrid"></div>
+          <h3 style="margin:8px 0 4px; font-size:14px;">Unduhan Dataset CSV Tervalidasi</h3>
+          <div class="download-grid" id="pubCsvDownloads"></div>
+          <details style="margin-top:8px;">
+            <summary style="font-weight:600; color:var(--navy);">Ringkasan Numerik Lengkap (outputs/summary.md)</summary>
+            <pre class="summary-pre" id="pubSummaryMd"></pre>
+          </details>
+        </article>
+      </div>
+    </section>
+
+    <!-- TAB C: METHODOLOGY & LIMITATIONS -->
+    <section id="panelMethodology" class="tab-panel" role="tabpanel" aria-labelledby="tabBtnMethodology" hidden>
+      <div class="section-stack" id="methodologyContent">
+        <div class="notice-bar info" id="methLoading" hidden>Memuat spesifikasi metodologi...</div>
+        <div class="notice-bar error" id="methError" hidden role="alert"></div>
+
+        <article class="panel chart-panel">
+          <div class="chart-head">
+            <h2>Model Matematis &amp; Persamaan Inti (src/)</h2>
+          </div>
+          <div class="eq-box">
+            PL(f_GHz, d_m) [dB] = 32,4 + 20·log₁₀(f_GHz) + 10·n·log₁₀(d_m) + X_σ,   X_σ ~ N(0, σ²)<br />
+            Pr [dBm] = Pt + Gt + Gr − L_feeder − L_body − PL<br />
+            N [dBm] = −174 + 10·log₁₀(N_RB · 180.000 Hz) + NF,   SNR_dB = Pr − N<br />
+            Eb/N0 [dB] = SNR_dB − 10·log₁₀(k),   k = log₂(M),   Rb [bps] = N_RB · 180.000 · k<br />
+            C_Shannon [bps] = B_active · log₂(1 + SNR_linear)  (referensi teoretis saja)
+          </div>
+          <ul style="margin:6px 0; padding-left:20px; display:flex; flex-direction:column; gap:6px;" id="methBullets"></ul>
+        </article>
+
+        <div class="two-col-grid">
+          <article class="panel chart-panel">
+            <div class="chart-head">
+              <h2>Parameter Default Sistem (config.py)</h2>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table" id="tblMethParams">
+                <thead>
+                  <tr><th>Parameter</th><th>Nilai</th><th>Basis / Sumber</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel chart-panel">
+            <div class="chart-head">
+              <h2>Ambang Switching Cho &amp; Yoon (2002) Eksak</h2>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table" id="tblMethThresholds">
+                <thead>
+                  <tr><th>Modulasi</th><th>Eb/N0 (BER 1e-2)</th><th>Es/N0 (BER 1e-2)</th><th>Eb/N0 (BER 1e-3)</th><th>Es/N0 (BER 1e-3)</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel chart-panel">
+          <div class="chart-head">
+            <h2>Batasan Model, Referensi, &amp; Pekerjaan Lanjutan</h2>
+          </div>
+          <ul style="margin:6px 0; padding-left:20px; display:flex; flex-direction:column; gap:6px;">
+            <li><strong>Cakupan riset utama vs sensitivitas:</strong> Konfigurasi riset utama adalah 900 dan 1800 MHz pada target BER 10⁻². Opsi 700 MHz (terinspirasi Reddy 2022 di atas model CI Park 2023) dan BER 10⁻³ adalah suplemen eksploratori, bukan replikasi Reddy (2022).</li>
+            <li><strong>Laju nominal tanpa coding:</strong> Laju Rb = B_active × log₂(M) bersifat tidak terkode (uncoded) tanpa FEC, pilot, cyclic prefix, atau penjadwalan MAC; nilai ini bukan throughput jaringan LTE aktual.</li>
+            <li><strong>Ekstrapolasi model CI:</strong> Parameter Park dkk. (2023) diukur pada 1400 MHz di Korea Selatan dan diekstrapolasikan ke 900/1800 MHz; belum dikalibrasi dengan pengukuran lapangan wilayah 3T Indonesia.</li>
+            <li><strong>Model yang sengaja tidak disertakan pada rilis ini (pekerjaan lanjutan):</strong> Fading Rician dan model difraksi medan tidak disertakan karena pendekatan pengali SNR dan difraksi tanpa profil elevasi medan (ITU-R P.526/P.1812) tidak valid secara ilmiah; keduanya dicatat sebagai pengembangan lanjutan.</li>
+            <li><strong>Peta zona radial &amp; sensor kanan:</strong> Peta radial merupakan model jarak hipotetis 1–12 km (bukan peta geografis). Radius yang mencapai ujung grid 12 km bersifat tersensor kanan (≥12 km).</li>
+            <li><strong>Referensi utama:</strong> Reddy dkk. (2022) DOI 10.1186/s13638-022-02133-3; Khan dkk. (2025) DOI 10.1038/s41598-025-16743-6 (dengan koreksi faktor Gray BER); Park dkk. (2023) arXiv:2305.01152; Yogapratama (2015) Table IV; Cho &amp; Yoon (2002); Laporan Kinerja Komdigi (2025).</li>
+            <li><strong>Atribusi tim &amp; desain antarmuka:</strong> Bahasa visual workbench terang, rail parameter, strip telemetri, grafik SNR, konstelasi, dan peta zona radial dibangun dari desain asli HTML/CSS/JS karya <strong>Zahran</strong> (diarsipkan di <code>prototypes/dashboard_interaktif_siskom.html</code>) yang diintegrasikan ke API Python tervalidasi (<code>src/</code>). Tim Kelompok 1: Aditya, Zahran, Baihaqy, Jeyd, Rizqul, Yusril.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- TAB D: ENCYCLOPEDIA -->
+    <section id="panelEncyclopedia" class="tab-panel" role="tabpanel" aria-labelledby="tabBtnEncyclopedia" hidden>
+      <div class="section-stack">
+        <div class="notice-bar">
+          Referensi istilah, singkatan, persamaan, satuan, dan batasan riset Kelompok 1. Seluruh 127 entri bersumber langsung dari <code>glossary_data.py</code> dan berstatus eksplisit: <em>Diimplementasikan di RuralLink</em>, <em>Latar belakang teoretis</em>, atau <em>Konteks literatur / tidak diimplementasikan</em>.
+        </div>
+
+        <article class="panel chart-panel">
+          <div class="filter-bar">
+            <div>
+              <label class="control-label" for="inpGlossSearch" style="margin-bottom:4px;">Cari istilah, kepanjangan, penjelasan, atau persamaan</label>
+              <input type="search" id="inpGlossSearch" placeholder="mis. Eb/N0, Wilson, 700 MHz, CSI..." />
+            </div>
+            <div>
+              <label class="control-label" for="selGlossCat" style="margin-bottom:4px;">Kategori</label>
+              <select id="selGlossCat">
+                <option value="Semua kategori">Semua kategori</option>
+              </select>
+            </div>
+            <a class="btn-secondary" href="/api/glossary/csv" download="rurallink_ensiklopedia.csv">Unduh CSV kamus</a>
+          </div>
+          <p class="control-hint" id="glossCount">Memuat entri kamus...</p>
+          <div class="notice-bar info" id="glossLoading" hidden>Memuat ensiklopedia...</div>
+          <div class="notice-bar error" id="glossError" hidden role="alert"></div>
+          <div class="notice-bar info" id="glossEmpty" hidden>Tidak ada entri yang cocok dengan kata kunci atau kategori tersebut.</div>
+
+          <div class="table-scroll">
+            <table class="data-table" id="tblGlossary">
+              <thead>
+                <tr>
+                  <th style="width:17%">Istilah / Singkatan</th>
+                  <th style="width:21%">Kepanjangan / Nama lengkap</th>
+                  <th style="width:40%">Penjelasan &amp; Relevansi RuralLink</th>
+                  <th style="width:22%">Persamaan / Simbol / Nilai</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    RuralLink (2026) · Kelompok 1 Sistem Komunikasi Digital: Aditya, Zahran, Baihaqy, Jeyd, Rizqul, Yusril · Desain visual asli oleh Zahran di atas mesin simulasi Python tervalidasi (<code>src/</code>).
+  </footer>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

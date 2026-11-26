@@ -1,17 +1,15 @@
 # Prototipe UI (referensi visual, bukan mesin ilmiah)
 
-`dashboard_rurallink.html` adalah dashboard HTML/CSS/JS standalone buatan Zahran (riwayat dan
-penulis Git asli dipertahankan). File ini menjadi fondasi desain visual aplikasi Streamlit
-(`app.py`): rail parameter di kiri, kontrol segmented, telemetry strip, kurva SNR, konstelasi,
-dan peta zona radial.
+Direktori ini mengarsipkan file HTML/CSS/JS standalone karya **Zahran** (riwayat dan penulis Git asli dipertahankan):
 
-**Jangan dipakai untuk angka penelitian.** Prototipe ini memuat hal yang sengaja tidak diwarisi
-aplikasi final:
+- `dashboard_rurallink.html` — versi prototipe awal yang menginspirasi tata letak aplikasi Streamlit (`app.py`).
+- `dashboard_interaktif_siskom.html` — versi terbaru buatan Zahran yang dijadikan fondasi langsung antarmuka web native (`public/index.html`) di atas API FastAPI (`api/index.py`).
 
-- frekuensi 700 MHz (di luar cakupan penelitian 900/1800 MHz) dan daya UE sampai 26 dBm (batas 23 dBm);
-- pendekatan BER QAM dan ambang SNR yang berbeda dari mesin Python tervalidasi;
-- rata-rata BER Rayleigh dipakai untuk adaptasi sesaat;
-- konstelasi sintetis 16-QAM hanya AWGN, tanpa transmisi Monte Carlo bit-level.
+**Jangan dipakai untuk angka penelitian.** Prototipe HTML standalone ini memuat pendekatan yang sengaja diganti oleh mesin Python tervalidasi (`src/`):
 
-Semua perhitungan final berasal dari `src/` (Python). Buka file ini langsung di browser untuk
-melihat desain aslinya.
+- daya pancar campuran 23–46 dBm (uplink/downlink), sedangkan simulasi uplink membatasi UE maksimal 23 dBm;
+- bandwidth tetap 5 MHz dan batas SNR universal LTE `-6,9 dB`, tanpa alokasi PRB (`1..25 RB`) dan ambang per-modulasi Cho–Yoon;
+- parameter difraksi tanpa profil elevasi medan dan pendekatan Rician melalui pengali SNR Rayleigh;
+- konstelasi sintetis 16-QAM saja tanpa simulasi Monte Carlo bit-level.
+
+Semua perhitungan final berasal dari `src/` (Python).
