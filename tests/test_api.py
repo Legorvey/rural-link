@@ -268,3 +268,16 @@ def test_compact_distance_stochastic_and_mc_preview_modes():
     assert mc_body["by_freq"] == {}
     assert mc_body["opt"]["n_bits"] == 10_000
     assert mc_body["opt"]["n_samples_awgn"] <= 320
+
+
+def test_native_web_ui_cleanup_contract():
+    html = client.get("/").text
+    assert 'class="topbar-meta"' not in html
+    assert 'id="workbenchStatusBar"' not in html
+    assert 'id="snrUpdateStatus"' not in html
+    assert 'id="mcStatusPill"' not in html
+    assert 'id="mcPairSummary"' not in html
+    assert 'id="chkShowReliability"' in html
+    assert 'id="chkLiveMc" checked' in html
+    for tab_id in ("panelWorkbench", "panelResults", "panelMethodology", "panelEncyclopedia"):
+        assert f'id="{tab_id}"' in html
