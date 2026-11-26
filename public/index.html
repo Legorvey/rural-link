@@ -304,14 +304,11 @@
           </div>
 
           <article class="panel chart-panel">
-            <div class="chart-head map-head">
-              <h2 id="mapTitle">Peta Cakupan Modulasi Adaptif</h2>
+            <div class="chart-head">
+              <h2>Peta Zona Modulasi Radial (1–12 km)</h2>
               <div class="map-controls">
-                <div class="segmented two-col map-mode-seg" role="group" aria-label="Pilih Mode Peta">
-                  <button type="button" class="seg-btn active" data-mapmode="capability" aria-pressed="true">Peta Cakupan Modulasi Adaptif</button>
-                  <button type="button" class="seg-btn" data-mapmode="optimizer" aria-pressed="false">Hasil Optimasi Modulasi &amp; RB</button>
-                </div>
-                <select id="selZoneStrat" class="map-select" disabled aria-label="Strategi Optimasi Peta">
+                <label for="selZoneStrat" class="map-ctl-label">Strategi:</label>
+                <select id="selZoneStrat" class="map-select">
                   <option value="S0">S0: Fixed QPSK, 25 RB</option>
                   <option value="S1">S1: Adaptive mod, 25 RB</option>
                   <option value="S2">S2: Adaptive BW, QPSK</option>
@@ -327,13 +324,13 @@
                   <span class="dot" style="background:#0D9488"></span>16-QAM
                   <span class="dot" style="background:#3B82F6"></span>QPSK
                   <span class="dot" style="background:#D97706"></span>BPSK
-                  <span class="dot" style="background:#CBD5E1"></span>Outage
+                  <span class="dot" style="background:#E2E8F0; border:1px solid #CBD5E1"></span>Outage
                 </span>
               </div>
             </div>
             <canvas id="cvMap" width="1180" height="295"></canvas>
             <p class="control-hint" id="mapCaption">
-              Modulasi tertinggi yang layak pada tiap jarak (1–12 km, N_RB = 1..25) · Pusat: BTS · Titik kuning: posisi UE.
+              Zona warna: median PL (1–12 km) · S3 dapat menghasilkan zona modulasi berulang karena perubahan jumlah Resource Block.
             </p>
           </article>
 
