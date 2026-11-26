@@ -1,0 +1,17 @@
+freq_mhz,environment,scenario,label,radius_median_km,radius_margin95_km,radius_stochastic_km,censored_at_grid_end
+900.0,LOS,S0,"Fixed QPSK, fixed 25 RB",12.0,9.0,8.75,True
+900.0,LOS,S1,"Adaptive modulation, 25 RB",12.0,12.0,12.0,True
+900.0,LOS,S2,"Adaptive bandwidth, QPSK",12.0,12.0,12.0,True
+900.0,LOS,S3,Joint adaptive,12.0,12.0,12.0,True
+900.0,NLOS,S0,"Fixed QPSK, fixed 25 RB",3.25,0.0,0.0,False
+900.0,NLOS,S1,"Adaptive modulation, 25 RB",4.5,0.0,0.0,False
+900.0,NLOS,S2,"Adaptive bandwidth, QPSK",12.0,2.25,2.0,True
+900.0,NLOS,S3,Joint adaptive,12.0,2.75,3.0,True
+1800.0,LOS,S0,"Fixed QPSK, fixed 25 RB",8.25,4.75,4.75,False
+1800.0,LOS,S1,"Adaptive modulation, 25 RB",11.25,6.5,6.5,False
+1800.0,LOS,S2,"Adaptive bandwidth, QPSK",12.0,12.0,12.0,True
+1800.0,LOS,S3,Joint adaptive,12.0,12.0,12.0,True
+1800.0,NLOS,S0,"Fixed QPSK, fixed 25 RB",2.0,0.0,0.0,False
+1800.0,NLOS,S1,"Adaptive modulation, 25 RB",2.5,0.0,0.0,False
+1800.0,NLOS,S2,"Adaptive bandwidth, QPSK",7.0,1.25,1.25,False
+1800.0,NLOS,S3,Joint adaptive,9.25,1.5,1.5,False
