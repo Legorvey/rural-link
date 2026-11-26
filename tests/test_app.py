@@ -26,7 +26,7 @@ def _md(at: AppTest) -> str:
     return " ".join(m.value for m in at.markdown)
 
 
-def test_default_render_header_tabs_and_strip():
+def test_default_render_single_page_workbench_and_tabs():
     at = _app()
     text = _md(at)
     assert "Kelompok 1" in text and "2026" in text
@@ -39,9 +39,14 @@ def test_default_render_header_tabs_and_strip():
         "Konfigurasi aktif",
         "Laju nominal",
         "Probabilitas outage",
+        "Peta zona modulasi radial sisi-ke-sisi",
+        "Fixed vs adaptif",
+        "Perbandingan frekuensi",
     ):
         assert label in text
-    assert len(at.tabs) == 4
+    assert len(at.tabs) == 3
+    assert len(at.get("plotly_chart")) == 4
+    assert len(at.dataframe) >= 4
     assert not at.error
 
 
@@ -61,6 +66,8 @@ def test_frequency_change_updates_telemetry_and_preset_resets():
     _run(at)
     assert at.session_state["freq"] == 900.0 and at.session_state["dist"] == 5.0
     assert at.session_state["strat"] == "S3"
+    assert at.session_state["ber_target"] == 1e-2
+    assert at.session_state["inc_700"] is False
 
 
 def test_adaptive_disables_manual_controls_manual_enables_them():
@@ -91,18 +98,48 @@ def test_baseline_outage_state_blocks_monte_carlo():
     assert at.button(key="run_mc").disabled
 
 
-def test_run_simulation_uses_engine_monte_carlo_and_both_strategies():
+def test_run_simulation_uses_engine_monte_carlo_and_both_views():
     at = _app()
     at.button(key="run_mc").click()
     _run(at)
-    text = _md(at)
+    text = " ".join(c.value for c in at.caption)
     assert "BER MC AWGN" in text and "Baseline S0" in text
     mc = at.session_state["mc"]
     assert mc["opt"]["samples_awgn"].size > 0 and mc["opt"]["mc_errors_awgn"] >= 0
     assert mc["base"] is None  # preset 900 MHz NLOS 5 km: S0 baseline in outage
+    assert 900.0 in mc["by_freq"] and 1800.0 in mc["by_freq"]
+    n_charts_with_mc = len(at.get("plotly_chart"))
+    assert n_charts_with_mc == 5
+
+    at.segmented_control(key="mc_view").set_value("Antar Frekuensi")
+    _run(at)
+    assert len(at.get("plotly_chart")) == n_charts_with_mc
+
     at.sidebar.slider(key="dist").set_value(2.0)
     _run(at)
     assert any("Parameter berubah" in w.value for w in at.warning)
+
+
+def test_optional_sensitivity_700mhz_and_ber_1e3():
+    at = _app()
+    at.sidebar.checkbox(key="inc_700").set_value(True)
+    at.sidebar.segmented_control(key="ber_target").set_value(1e-3)
+    _run(at)
+    text = _md(at)
+    assert "Mode sensitivitas eksploratori aktif" in text
+    assert "bukan replikasi Reddy" in text
+    at.sidebar.segmented_control(key="freq").set_value(700.0)
+    _run(at)
+    assert at.session_state["freq"] == 700.0
+    assert not at.error
+
+
+def test_zone_strategy_sync_and_independent_override():
+    at = _app()
+    assert at.session_state["zone_sc"] == "S3"
+    at.selectbox(key="zone_sc").set_value("S0")
+    _run(at)
+    assert at.session_state["zone_sc"] == "S0"
 
 
 def test_live_results_match_published_csv():
