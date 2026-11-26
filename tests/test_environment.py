@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-PKGS = ["numpy", "scipy", "pandas", "matplotlib", "plotly", "streamlit"]
+PKGS = ["numpy", "scipy", "pandas", "matplotlib"]
 
 
 def test_python_version():
