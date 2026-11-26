@@ -651,6 +651,56 @@
     color: var(--ink-muted);
   }
 
+  .gloss-math {
+    font-family: "Cambria Math", "STIX Two Math", Georgia, "Times New Roman", serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink);
+    display: inline-block;
+  }
+
+  .gloss-math sub, .gloss-math sup {
+    font-size: 74%;
+  }
+
+  .gloss-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--ink);
+  }
+
+  .gloss-empty {
+    color: var(--ink-muted);
+  }
+
+  .gloss-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 4px;
+    margin-right: 6px;
+    vertical-align: baseline;
+  }
+
+  .gloss-badge-impl {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+  }
+
+  .gloss-badge-lit {
+    background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+  }
+
+  .gloss-badge-theory {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+  }
+
 </style>
 </head>
 <body>
@@ -696,10 +746,10 @@
       <div class="control-group">
         <label class="control-label" for="selStrategy">Skenario Adaptasi (S0 s.d. S3)</label>
         <select id="selStrategy">
-          <option value="S3" selected>S3: Joint Adaptive (Modulasi + RB)</option>
+          <option value="S0">S0: Baseline Fixed (QPSK + 25 RB)</option>
           <option value="S1">S1: Adaptive Modulasi (Fixed 25 RB)</option>
           <option value="S2">S2: Adaptive Bandwidth (Fixed QPSK)</option>
-          <option value="S0">S0: Baseline Fixed (QPSK + 25 RB)</option>
+          <option value="S3" selected>S3: Joint Adaptive (Modulasi + RB)</option>
           <option value="R0">R0: Referensi Ketahanan (BPSK + 1 RB)</option>
           <option value="MANUAL">Manual (Kunci N_RB Pilihan)</option>
         </select>
@@ -1720,13 +1770,60 @@
     glossCatEl.appendChild(opt);
   });
 
+  function formatGlossDesc(raw) {
+    const text = String(raw || "");
+    const m = text.match(/^\[(Diimplementasikan di RuralLink|Konteks literatur \/ tidak diimplementasikan|Latar belakang teoretis)\]\s*(.*)$/);
+    if (!m) return escHtml(text);
+    const label = m[1];
+    const cls = label.startsWith("Diimplementasikan")
+      ? "gloss-badge-impl"
+      : (label.startsWith("Konteks") ? "gloss-badge-lit" : "gloss-badge-theory");
+    return `<span class="gloss-badge ${cls}">${escHtml(label)}</span>${escHtml(m[2])}`;
+  }
+
+  function formatGlossEq(raw) {
+    const val = String(raw || "").trim();
+    if (!val || val === "-") return '<span class="gloss-empty">-</span>';
+    if (/^(DOI:|Python |seed =|block_size =)/.test(val)) {
+      return `<code class="gloss-code">${escHtml(val)}</code>`;
+    }
+    let s = escHtml(val);
+    s = s.replace(/\bx_hat\b/g, "x&#770;").replace(/\bs_hat\b/g, "s&#770;");
+    const greek = { sigma: "&sigma;", gamma: "&gamma;", lambda: "&lambda;", pi: "&pi;", eta: "&eta;", Delta: "&Delta;" };
+    s = s.replace(/(^|[^A-Za-z])(sigma|gamma|lambda|pi|eta|Delta)(?![A-Za-z])/g, (_, p, g) => p + greek[g]);
+    s = s.replace(/\b1e-2\b/g, "10<sup>-2</sup>")
+         .replace(/\b1e-3\b/g, "10<sup>-3</sup>")
+         .replace(/\b5e6\b/g, "(5 &times; 10<sup>6</sup>)")
+         .replace(/\bsqrt\(2\)/g, "&radic;2")
+         .replace(/\blog10\b/g, "log<sub>10</sub>")
+         .replace(/\blog2\b/g, "log<sub>2</sub>")
+         .replace(/\^\(([^)]+)\)/g, "<sup>$1</sup>")
+         .replace(/\^(-?\d+|[A-Za-z])/g, "<sup>$1</sup>")
+         .replace(/\b(Pt|Pr|N0)_([A-Za-z0-9%]+(?:[,_][A-Za-z0-9%]+)*)/g, (_, b, sub) => b[0] + "<sub>" + b.slice(1) + "," + sub.replace(/_/g, ",") + "</sub>")
+         .replace(/\(([^)]+)\)_([A-Za-z0-9]+)/g, "($1)<sub>$2</sub>")
+         .replace(/([A-Za-z0-9]+|&(?:sigma|gamma|lambda|pi|eta|Delta);)_([A-Za-z0-9%]+(?:[,_][A-Za-z0-9%]+)*|&(?:sigma|gamma|lambda|pi|eta|Delta);)/g,
+           (_, b, sub) => b + "<sub>" + sub.replace(/_/g, ",") + "</sub>")
+         .replace(/(<sub\b[^>]*>.*?<\/sub>|<sup\b[^>]*>.*?<\/sup>|<[^>]+>)|\b(Pt|Pr|Gt|Gr|Rb|Rs|Es|Eb|N0|T0|d0|fc)\b/g,
+           (_, tag, sym) => tag || (sym[0] + "<sub>" + sym.slice(1) + "</sub>"))
+         .replace(/(<[^>]+>)|(-&gt;|&lt;=|&gt;=|\s+in\s+)/g, (m, tag, op) => {
+           if (tag) return tag;
+           if (op === "-&gt;") return "&rarr;";
+           if (op === "&lt;=") return "&le;";
+           if (op === "&gt;=") return "&ge;";
+           if (/^\s+in\s+$/.test(op)) return " &isin; ";
+           return m;
+         })
+         .replace(/(\d|<\/sub>|\])\s+x\s+(?=\d|&sigma;|k\b|\()/g, "$1 &times; ");
+    return `<span class="gloss-math">${s}</span>`;
+  }
+
   function buildGlossTableHtml(items) {
     const rows = items.map((e) => `
       <tr>
         <td><strong>${escHtml(e.i)}</strong></td>
         <td>${escHtml(e.p)}</td>
-        <td>${escHtml(e.d)}</td>
-        <td><code>${escHtml(e.eq)}</code></td>
+        <td>${formatGlossDesc(e.d)}</td>
+        <td>${formatGlossEq(e.eq)}</td>
       </tr>`).join("");
     return `
       <div class="data-table-wrap">
